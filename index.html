@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e0e11">
+<title>Decision Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { background: #0e0e11 !important; color-scheme: dark; }
+  body {
+    font-family: 'DM Mono', monospace;
+    background: #0e0e11 !important;
+    color: #e8e8e8;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    display: flex;
+    justify-content: center;
+  }
+  #app {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    background: #0e0e11;
+  }
+  .header {
+    padding: 24px 20px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky;
+    top: 0;
+    background: #0e0e11;
+    z-index: 10;
+  }
+  .header-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: #4ade80;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .header-title {
+    font-size: 18px;
+    font-weight: 500;
+    color: #fff;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .tabs {
+    display: flex;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 0;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #777;
+    font-size: 10px;
+    font-family: inherit;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    border-bottom-color: #4ade80;
+    color: #4ade80;
+  }
+  .content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: #0e0e11;
+  }
+
+  /* HOME */
+  .streak-box {
+    background: linear-gradient(135deg, rgba(74,222,128,0.1), rgba(96,165,250,0.06));
+    border: 1px solid rgba(74,222,128,0.18);
+    border-radius: 16px;
+    padding: 24px 20px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .streak-num {
+    font-size: 64px;
+    font-weight: 500;
+    color: #4ade80;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .streak-label {
+    font-size: 10px;
+    color: rgba(74,222,128,0.75);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: #1a1a1f;
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .stat-val {
+    font-size: 28px;
+    font-weight: 500;
+    color: #4ade80;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-val.blue { color: #60a5fa; }
+  .stat-val.red { color: #ef4444; }
+  .stat-val.muted { color: #666; }
+  .stat-label {
+    font-size: 9px;
+    color: #888;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .status-banner {
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+  }
+  .status-banner.good {
+    background: rgba(74,222,128,0.06);
+    border: 1px solid rgba(74,222,128,0.15);
+    color: rgba(74,222,128,0.8);
+  }
+  .status-banner.bad {
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.15);
+    color: rgba(239,68,68,0.8);
+  }
+
+  /* LOG */
+  .section-title {
+    font-size: 10px;
+    color: #888;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .decision-btn {
+    width: 100%;
+    background: #1a1a1f;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 10px;
+    text-align: left;
+    color: #ffffff;
+    font-family: inherit;
+  }
+  .decision-btn:active, .decision-btn.flash {
+    background: rgba(74,222,128,0.12);
+    border-color: rgba(74,222,128,0.4);
+    transform: scale(0.98);
+  }
+  .dec-emoji { font-size: 22px; min-width: 30px; text-align: center; }
+  .dec-label { font-size: 14px; font-weight: 500; margin-bottom: 3px; letter-spacing: -0.01em; color: #ffffff; }
+  .dec-desc { font-size: 11px; color: #aaaaaa; letter-spacing: 0.02em; line-height: 1.4; }
+  .clear-section {
+    margin-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 20px;
+  }
+  .clear-label {
+    font-size: 10px;
+    color: #888;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .clear-btn {
+    width: 100%;
+    background: rgba(239,68,68,0.05);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 12px;
+    padding: 14px;
+    color: #c06060;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .clear-btn.confirm {
+    background: rgba(239,68,68,0.15);
+    border-color: rgba(239,68,68,0.5);
+    color: #ef4444;
+  }
+  .confirm-row {
+    display: flex;
+    gap: 10px;
+  }
+  .confirm-row button {
+    flex: 1;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .confirm-yes {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.5);
+    color: #ef4444;
+  }
+  .confirm-no {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #666;
+  }
+  .clear-note {
+    font-size: 11px;
+    color: #666;
+    margin-top: 10px;
+    letter-spacing: 0.03em;
+    line-height: 1.7;
+  }
+
+  /* HISTORY */
+  .hist-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 80px;
+    margin-bottom: 6px;
+  }
+  .hist-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+  .hist-bar {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.4s ease;
+    min-height: 3px;
+  }
+  .hist-bar.good { background: #4ade80; }
+  .hist-bar.splurge { background: #ef4444; }
+  .hist-bar.empty { background: rgba(255,255,255,0.05); }
+  .hist-labels {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 20px;
+  }
+  .hist-lbl { flex: 1; font-size: 9px; color: #777; text-align: center; }
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 0.06em;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+  .breakdown-row { margin-bottom: 14px; }
+  .breakdown-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 11px;
+  }
+  .breakdown-name { color: #c0c0c0; }
+  .breakdown-count { color: #4ade80; font-weight: 500; }
+  .bar-track {
+    background: rgba(255,255,255,0.07);
+    border-radius: 6px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: #4ade80;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+  }
+  .summary-card {
+    margin-top: 20px;
+    background: #1a1a1f;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 5px 0;
+  }
+  .summary-row + .summary-row { border-top: 1px solid rgba(255,255,255,0.05); }
+  .summary-key { color: #888; }
+  .summary-val { font-weight: 500; }
+
+  /* EXPORT / IMPORT */
+  .data-section {
+    margin-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 20px;
+  }
+  .data-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .data-btn {
+    flex: 1;
+    border-radius: 12px;
+    padding: 13px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+    text-align: center;
+  }
+  .export-btn {
+    background: rgba(96,165,250,0.1);
+    border: 1px solid rgba(96,165,250,0.25);
+    color: #93c5fd;
+  }
+  .export-btn:active { background: rgba(96,165,250,0.2); }
+  .import-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #aaaaaa;
+  }
+  .import-btn:active { background: rgba(255,255,255,0.1); }
+  .data-note {
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 0.03em;
+    line-height: 1.7;
+    margin-top: 6px;
+  }
+  .import-success {
+    font-size: 11px;
+    color: #4ade80;
+    margin-top: 8px;
+    letter-spacing: 0.03em;
+  }
+  .import-error {
+    font-size: 11px;
+    color: #ef4444;
+    margin-top: 8px;
+    letter-spacing: 0.03em;
+  }
+
+  /* CONFETTI */
+  .confetti-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 999;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    animation: cfly var(--dur) ease-out forwards;
+  }
+  @keyframes cfly {
+    0% { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(0.2); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-eyebrow">Decision Tracker</div>
+    <div class="header-title">Every good choice counts</div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('home')">Home</button>
+      <button class="tab-btn" onclick="switchTab('log')">Log</button>
+      <button class="tab-btn" onclick="switchTab('history')">History</button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+<div class="confetti-container" id="confetti"></div>
+
+<script>
+const DECISIONS = [
+  { id: 'healthy_meal', label: 'Meal Within Guidelines', emoji: '🥗', desc: 'Beans, veggies, fish, eggs — on plan' },
+  { id: 'omitted_cal', label: 'Omitted High-Cal Ingredient', emoji: '🚫', desc: 'Skipped bread, rice, or similar' },
+  { id: 'skipped_snack', label: 'Skipped a Snack', emoji: '✋', desc: 'Wanted something, chose nothing' },
+  { id: 'healthy_snack', label: 'Chose Healthy Snack', emoji: '🍎', desc: 'Reached for fruit instead of bread' },
+  { id: 'turned_seconds', label: 'Turned Down Seconds', emoji: '📦', desc: 'Packed it up instead of kept eating' },
+  { id: 'ate_slowly', label: 'Ate Slowly', emoji: '🐢', desc: 'Paused, chewed, let satiety catch up' },
+];
+
+const STORAGE_KEY = 'diet_tracker_v1';
+let currentTab = 'home';
+let confirmingClear = false;
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { log: [] }; }
+  catch { return { log: [] }; }
+}
+function saveData(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
+}
+function getTodayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getStats() {
+  const data = loadData();
+  const today = getTodayStr();
+  const todayLog = data.log.filter(e => e.date === today);
+  const todayGood = todayLog.filter(e => e.type === 'decision').length;
+  const todayClears = todayLog.filter(e => e.type === 'clear').length;
+  const netToday = todayGood - todayClears * 3;
+
+  const reversed = [...data.log].reverse();
+  let streak = 0;
+  for (const e of reversed) {
+    if (e.type === 'clear') break;
+    if (e.type === 'decision') streak++;
+  }
+
+  const dayMap = {};
+  for (const e of data.log) {
+    if (!dayMap[e.date]) dayMap[e.date] = { good: 0, clears: 0 };
+    if (e.type === 'decision') dayMap[e.date].good++;
+    if (e.type === 'clear') dayMap[e.date].clears++;
+  }
+  const goodDays = Object.values(dayMap).filter(d => d.good - d.clears * 3 > 0).length;
+  const totalClears = data.log.filter(e => e.type === 'clear').length;
+  const totalDecisions = data.log.filter(e => e.type === 'decision').length;
+
+  return { streak, todayGood, todayClears, netToday, goodDays, totalClears, totalDecisions, data };
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  confirmingClear = false;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['home','log','history'][i] === tab);
+  });
+  render();
+}
+
+function render() {
+  const s = getStats();
+  const el = document.getElementById('content');
+  if (currentTab === 'home') el.innerHTML = renderHome(s);
+  else if (currentTab === 'log') el.innerHTML = renderLog(s);
+  else el.innerHTML = renderHistory(s);
+}
+
+function renderHome(s) {
+  let banner = '';
+  if (s.netToday > 0) {
+    banner = `<div class="status-banner good">✦ Today is a good day — ${s.netToday} net positive decisions</div>`;
+  } else if (s.todayClears > 0) {
+    banner = `<div class="status-banner bad">✦ Splurge logged today — build the streak back up</div>`;
+  }
+  return `
+    <div class="streak-box">
+      <div class="streak-num">${s.streak}</div>
+      <div class="streak-label">decision streak</div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val">${s.todayGood}</div>
+        <div class="stat-label">good today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">${s.goodDays}</div>
+        <div class="stat-label">good days total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val blue">${s.totalDecisions}</div>
+        <div class="stat-label">all-time decisions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val ${s.totalClears > 0 ? 'red' : 'muted'}">${s.totalClears}</div>
+        <div class="stat-label">splurges logged</div>
+      </div>
+    </div>
+    ${banner}
+  `;
+}
+
+function renderLog(s) {
+  const btns = DECISIONS.map(d => `
+    <button class="decision-btn" onclick="logDecision('${d.id}')">
+      <span class="dec-emoji">${d.emoji}</span>
+      <div>
+        <div class="dec-label">${d.label}</div>
+        <div class="dec-desc">${d.desc}</div>
+      </div>
+    </button>
+  `).join('');
+
+  const clearSection = confirmingClear ? `
+    <div class="confirm-row">
+      <button class="confirm-yes" onclick="logClear()">Yes, log it</button>
+      <button class="confirm-no" onclick="cancelClear()">Cancel</button>
+    </div>
+  ` : `
+    <button class="clear-btn" onclick="startClear()">Log a Splurge</button>
+  `;
+
+  return `
+    <p class="section-title">Log a good decision</p>
+    ${btns}
+    <div class="clear-section">
+      <p class="clear-label">Had a splurge?</p>
+      ${clearSection}
+      <p class="clear-note">Logging a splurge is honest accounting — not failure. Your streak resets but the data stays. You can rebuild a strong streak before lunch.</p>
+    </div>
+  `;
+}
+
+function renderHistory(s) {
+  const last14 = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (13 - i));
+    const str = d.toISOString().slice(0, 10);
+    const entries = s.data.log.filter(e => e.date === str);
+    const good = entries.filter(e => e.type === 'decision').length;
+    const clears = entries.filter(e => e.type === 'clear').length;
+    return { str, good, clears, net: good - clears * 3, label: str.slice(8) };
+  });
+  const maxBar = Math.max(...last14.map(d => d.good), 1);
+
+  const bars = last14.map(day => {
+    const h = day.good > 0 ? Math.max(6, (day.good / maxBar) * 70) : 4;
+    const cls = day.clears > 0 ? 'splurge' : day.good > 0 ? 'good' : 'empty';
+    return `<div class="hist-col"><div class="hist-bar ${cls}" style="height:${h}px"></div></div>`;
+  }).join('');
+
+  const labels = last14.map(day => `<div class="hist-lbl">${day.label}</div>`).join('');
+
+  const breakdown = DECISIONS.map(dec => {
+    const count = s.data.log.filter(e => e.type === 'decision' && e.id === dec.id).length;
+    return { ...dec, count };
+  });
+  const maxB = Math.max(...breakdown.map(b => b.count), 1);
+
+  const brows = breakdown.map(b => `
+    <div class="breakdown-row">
+      <div class="breakdown-header">
+        <span class="breakdown-name">${b.emoji} ${b.label}</span>
+        <span class="breakdown-count">${b.count}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${maxB > 0 ? (b.count/maxB)*100 : 0}%"></div></div>
+    </div>
+  `).join('');
+
+  return `
+    <p class="section-title">Last 14 days</p>
+    <div class="hist-chart">${bars}</div>
+    <div class="hist-labels">${labels}</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>good decisions</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>splurge day</div>
+    </div>
+    <p class="section-title">Decision breakdown</p>
+    ${brows}
+    <div class="summary-card">
+      <div class="summary-row"><span class="summary-key">Total good decisions</span><span class="summary-val" style="color:#4ade80">${s.totalDecisions}</span></div>
+      <div class="summary-row"><span class="summary-key">Splurges logged</span><span class="summary-val" style="color:${s.totalClears > 0 ? '#ef4444' : '#555'}">${s.totalClears}</span></div>
+      <div class="summary-row"><span class="summary-key">Good days</span><span class="summary-val" style="color:#60a5fa">${s.goodDays}</span></div>
+    </div>
+    <div class="data-section">
+      <p class="section-title">Your data</p>
+      <div class="data-row">
+        <button class="data-btn export-btn" onclick="exportData()">⬇ Export backup</button>
+        <button class="data-btn import-btn" onclick="document.getElementById('import-input').click()">⬆ Import backup</button>
+      </div>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+      <div id="import-status"></div>
+      <p class="data-note">Export saves your log as a .json file. Import restores from a previous export. Use these to back up your data or move it to a new device.</p>
+    </div>
+  `;
+}
+
+function logDecision(id) {
+  const data = loadData();
+  data.log.push({ id, date: getTodayStr(), ts: Date.now(), type: 'decision' });
+  saveData(data);
+  spawnConfetti();
+  flashBtn(id);
+  render();
+}
+
+function startClear() {
+  confirmingClear = true;
+  render();
+}
+function cancelClear() {
+  confirmingClear = false;
+  render();
+}
+function logClear() {
+  const data = loadData();
+  data.log.push({ date: getTodayStr(), ts: Date.now(), type: 'clear' });
+  saveData(data);
+  confirmingClear = false;
+  render();
+}
+
+function flashBtn(id) {
+  setTimeout(() => {
+    const btns = document.querySelectorAll('.decision-btn');
+    btns.forEach(btn => {
+      if (btn.getAttribute('onclick') === `logDecision('${id}')`) {
+        btn.classList.add('flash');
+        setTimeout(() => btn.classList.remove('flash'), 500);
+      }
+    });
+  }, 10);
+}
+
+function spawnConfetti() {
+  const container = document.getElementById('confetti');
+  const colors = ['#4ade80','#facc15','#f97316','#60a5fa','#e879f9','#fb7185','#34d399'];
+  const pieces = Array.from({ length: 24 }, () => {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    const size = 6 + Math.random() * 8;
+    const x = 20 + Math.random() * 60;
+    const tx = (Math.random() - 0.5) * 160;
+    const ty = -(120 + Math.random() * 180);
+    const rot = 360 + Math.random() * 360;
+    const dur = (1 + Math.random() * 0.8).toFixed(2);
+    el.style.cssText = `
+      left:${x}%;top:45%;
+      width:${size}px;height:${size}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius:${Math.random()>0.5?'50%':'3px'};
+      --tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;--dur:${dur}s;
+    `;
+    return el;
+  });
+  pieces.forEach(p => container.appendChild(p));
+  setTimeout(() => pieces.forEach(p => p.remove()), 2000);
+}
+
+function exportData() {
+  const data = loadData();
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `diet-tracker-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.log || !Array.isArray(parsed.log)) throw new Error('Invalid format');
+      saveData(parsed);
+      const status = document.getElementById('import-status');
+      if (status) {
+        status.innerHTML = `<p class="import-success">✓ Imported ${parsed.log.length} entries successfully</p>`;
+        setTimeout(() => { status.innerHTML = ''; render(); }, 4000);
+      }
+      render();
+    } catch (err) {
+      const status = document.getElementById('import-status');
+      if (status) status.innerHTML = `<p class="import-error">✗ Could not read file — make sure it's a valid backup</p>`;
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+render();
+</script>
+</body>
+</html>
