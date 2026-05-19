@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>字根图 · Character Graph</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080810;--card:#111120;--border:#1e1e35;
+  --text:#f0ece0;--muted:#888;--dim:#2a2a3a;
+  --gold:#f5e642;
+  --sem:#4fc3f7;--phon:#ff9f43;--phrase:#a78bfa;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;height:100%;overflow:hidden;touch-action:manipulation;}
+#app{display:flex;flex-direction:column;height:100dvh;}
+
+/* TOP BAR */
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(8,8,16,.97);z-index:20;}
+.app-title{font-size:clamp(.7rem,2.2vw,.85rem);font-weight:700;color:var(--gold);letter-spacing:.12em;}
+.app-sub{font-size:.45rem;color:var(--muted);letter-spacing:.1em;margin-top:1px;}
+
+/* LEGEND — compact filter toggles only, moved to top-right corner of graph */
+#legend{
+  position:absolute;top:.5rem;right:.7rem;z-index:12;
+  display:flex;gap:.3rem;align-items:center;
+}
+.leg{
+  font-size:.52rem;color:var(--muted);cursor:pointer;
+  padding:2px 7px;border-radius:10px;border:1px solid var(--border);
+  transition:all .15s;letter-spacing:.04em;background:rgba(8,8,16,.8);
+}
+.leg.on[data-nb="meaning"]{color:var(--sem);border-color:var(--sem);background:rgba(79,195,247,.08);}
+.leg.on[data-nb="sound"]  {color:var(--phon);border-color:var(--phon);background:rgba(255,159,67,.08);}
+.leg.on[data-nb="phrase"] {color:var(--phrase);border-color:var(--phrase);background:rgba(167,139,250,.08);}
+/* Hide the dot — label alone is enough */
+.leg-dot{display:none;}
+
+/* Color key — tiny, always visible, bottom-left of graph */
+#color-key{
+  position:absolute;bottom:3.6rem;left:.8rem;z-index:8;
+  font-size:.48rem;color:var(--dim);line-height:2;letter-spacing:.04em;
+  pointer-events:none;
+}
+.ck-row{display:flex;align-items:center;gap:4px;}
+.ck-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* GRAPH */
+#graph-wrap{flex:1;position:relative;overflow:hidden;}
+#graph-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+
+/* CENTER NODE */
+.cn{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;pointer-events:auto;}
+.cn-char{font-family:'Noto Sans SC',sans-serif;font-size:clamp(3.2rem,12vw,4.8rem);font-weight:900;color:#fff;line-height:1;cursor:pointer;transition:transform .15s;}
+.cn-char:hover{transform:scale(1.05);}
+.cn-below{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:.4rem;}
+.cn-py{font-size:clamp(.75rem,2.5vw,.95rem);color:var(--gold);font-weight:700;}
+.cn-en{font-size:clamp(.55rem,1.8vw,.68rem);color:var(--muted);}
+.cn-variant{font-size:clamp(.45rem,1.4vw,.55rem);color:rgba(245,230,66,.5);letter-spacing:.06em;margin-top:1px;}
+
+/* ORBIT NODES */
+.on{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transition:transform .2s;}
+.on:hover{transform:translate(-50%,-50%) scale(1.1);}
+.on-bubble{padding:.28rem .45rem;border-radius:6px;border:1px solid;display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--card);min-width:42px;transition:border-color .15s,box-shadow .15s;}
+.on-char{font-family:'Noto Sans SC',sans-serif;font-size:clamp(1.2rem,4.5vw,1.8rem);font-weight:700;line-height:1;}
+.on-py{font-size:clamp(.4rem,1.3vw,.52rem);color:var(--muted);}
+.on-en{font-size:clamp(.36rem,1.1vw,.46rem);color:var(--dim);text-align:center;max-width:62px;line-height:1.2;}
+.on.phrase .on-bubble{border-radius:18px;}
+.on.phrase .on-char{font-size:clamp(.7rem,2.5vw,1rem);color:var(--phrase);}
+/* Trail = previous nodes = EMPHASIZED, not dimmed */
+.on.trail .on-bubble{border-style:solid;border-color:var(--gold);background:rgba(245,230,66,.07);}
+.on.trail .on-char{color:var(--gold);}
+.on.trail .on-py{color:rgba(245,230,66,.7);}
+
+/* BREAK BUTTON — splits compound into components */
+#break-btn{
+  position:absolute;transform:translate(-50%,-50%);
+  z-index:12;cursor:pointer;
+  background:rgba(30,30,50,.85);border:1px solid var(--border);
+  border-radius:20px;padding:3px 8px;
+  font-size:.62rem;letter-spacing:.04em;color:var(--muted);
+  transition:all .15s;user-select:none;
+  display:none;
+}
+#break-btn:hover{border-color:var(--gold);color:var(--gold);background:rgba(245,230,66,.08);}
+#break-btn.visible{display:block;}
+
+/* SPLIT OVERLAY */
+#split-overlay{
+  position:absolute;inset:0;z-index:20;
+  display:none;pointer-events:none;
+  background:rgba(8,8,16,0);
+  transition:background .3s;
+}
+#split-overlay.active{display:block;pointer-events:auto;background:rgba(8,8,16,0.82);}
+.split-part{
+  position:absolute;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  transition:left .5s cubic-bezier(.34,1.4,.64,1), top .5s cubic-bezier(.34,1.4,.64,1), opacity .4s;
+  cursor:pointer;
+}
+.split-char{font-family:'Noto Sans SC',sans-serif;font-size:clamp(2.2rem,9vw,3.2rem);font-weight:900;line-height:1;}
+.split-py{font-size:clamp(.7rem,2.5vw,.9rem);font-weight:700;}
+.split-en{font-size:clamp(.55rem,1.8vw,.68rem);color:var(--muted);}
+.split-dismiss{
+  position:absolute;
+  background:rgba(245,230,66,.1);border:1px solid rgba(245,230,66,.4);
+  color:var(--gold);font-family:'Space Mono',monospace;font-size:.62rem;
+  font-weight:700;padding:3px 10px;cursor:pointer;border-radius:14px;
+  letter-spacing:.04em;white-space:nowrap;transform:translate(-50%,-50%);
+}
+.split-dismiss:hover{background:rgba(245,230,66,.2);}
+/* Center character ghost shown during break */
+#split-ghost{
+  position:absolute;transform:translate(-50%,-50%);
+  font-family:'Noto Sans SC',sans-serif;font-size:clamp(3rem,12vw,5rem);
+  font-weight:900;color:rgba(255,255,255,.04);pointer-events:none;
+  transition:opacity .3s;
+}
+
+/* INLINE INFO STRIP */
+#info-strip{
+  position:absolute;bottom:4rem;left:50%;transform:translateX(-50%);
+  width:min(460px,94vw);
+  background:rgba(12,12,22,0.95);border:1px solid var(--border);border-radius:10px;
+  padding:.8rem 1rem;z-index:8;
+  opacity:0;transition:opacity .25s;
+  backdrop-filter:blur(10px);
+}
+/* Note is the main content — large and readable */
+.is-note{font-size:clamp(.62rem,2vw,.78rem);color:var(--text);line-height:1.75;text-align:center;margin-bottom:.55rem;}
+/* Components row is secondary — smaller, below the note */
+.is-parts{display:flex;align-items:center;justify-content:center;gap:.5rem;padding-top:.45rem;border-top:1px solid var(--border);}
+.is-part{font-family:'Noto Sans SC',sans-serif;font-size:clamp(.9rem,3.2vw,1.2rem);font-weight:700;display:flex;align-items:baseline;gap:3px;cursor:pointer;}
+.is-part:hover{opacity:.75;}
+.is-role{font-size:.38rem;font-family:'Space Mono',monospace;letter-spacing:.05em;color:var(--muted);margin-left:2px;}
+.is-nav{font-size:.5rem;color:var(--sem);margin-left:2px;}
+.is-plus{font-size:.9rem;color:var(--dim);}
+
+/* ROOT PICKER — more room from bottom */
+#root-picker{position:absolute;bottom:.6rem;left:50%;transform:translateX(-50%);display:flex;gap:.25rem;flex-wrap:wrap;justify-content:center;max-width:88%;z-index:9;}
+.rp{font-family:'Noto Sans SC',sans-serif;font-size:clamp(.8rem,2.8vw,1rem);color:#484848;cursor:pointer;transition:color .15s;padding:1px 2px;border:1px solid transparent;border-radius:3px;}
+.rp:hover{color:var(--muted);}
+.rp.active{color:var(--gold);border-color:rgba(245,230,66,.25);}
+.e-sem{stroke:var(--sem);stroke-width:1;opacity:.45;}
+.e-phon{stroke:var(--phon);stroke-width:1;opacity:.4;stroke-dasharray:5 4;}
+.e-phrase{stroke:var(--phrase);stroke-width:1;opacity:.3;stroke-dasharray:2 5;}
+.e-trail{stroke:var(--gold);stroke-width:1.5;opacity:.4;}
+
+/* BACK BTN */
+#back-btn{position:absolute;top:.6rem;left:.7rem;z-index:10;background:rgba(245,230,66,.1);border:1px solid rgba(245,230,66,.35);color:var(--gold);font-family:'Space Mono',monospace;font-size:.65rem;padding:.35rem .8rem;cursor:pointer;border-radius:4px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s;}
+#back-btn.show{opacity:1;pointer-events:auto;}
+#back-btn:hover{background:rgba(245,230,66,.18);}
+
+/* LEGEND — bigger and usable */
+#legend{display:flex;gap:.5rem;}
+.leg{display:flex;align-items:center;gap:5px;font-size:clamp(.55rem,1.8vw,.68rem);color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:4px;border:1px solid transparent;transition:all .15s;font-weight:700;letter-spacing:.04em;}
+.leg.on{color:var(--text);border-color:var(--border);background:rgba(255,255,255,.04);}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* ROOT PICKER */
+#root-picker{position:absolute;bottom:.5rem;left:50%;transform:translateX(-50%);display:flex;gap:.3rem;flex-wrap:wrap;justify-content:center;max-width:94%;z-index:9;}
+.rp{font-family:'Noto Sans SC',sans-serif;font-size:clamp(.85rem,3vw,1.1rem);color:#555;cursor:pointer;transition:color .15s;padding:2px 3px;border:1px solid transparent;border-radius:3px;}
+.rp:hover{color:var(--muted);}
+.rp.active{color:var(--gold);border-color:rgba(245,230,66,.25);}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="topbar">
+  <div>
+    <div class="app-title">字根图 · Character Graph</div>
+    <div class="app-sub">TAP ANY NODE TO NAVIGATE · ⚡ BREAK TO DECOMPOSE</div>
+  </div>
+</div>
+
+<div id="graph-wrap">
+  <svg id="graph-svg"></svg>
+  <!-- Legend filters — top right -->
+  <div id="legend">
+    <div class="leg on" data-nb="meaning">MEANING</div>
+    <div class="leg on" data-nb="sound">SOUND</div>
+    <div class="leg on" data-nb="phrase">PHRASE</div>
+  </div>
+  <button id="back-btn" onclick="navBack()">← BACK</button>
+  <div id="break-btn" onclick="triggerBreak()">⚡ BREAK</div>
+  <div id="split-overlay">
+    <div id="split-ghost"></div>
+    <div class="split-part" id="split-left" onclick="splitNav('left')"></div>
+    <div class="split-part" id="split-right" onclick="splitNav('right')"></div>
+    <button class="split-dismiss" onclick="closeSplit()">↩ UNBREAK</button>
+  </div>
+  <!-- Color key — bottom left, always visible -->
+  <div id="color-key">
+    <div class="ck-row"><div class="ck-dot" style="background:var(--sem)"></div>blue = meaning family</div>
+    <div class="ck-row"><div class="ck-dot" style="background:var(--phon)"></div>orange = sound family</div>
+    <div class="ck-row"><div class="ck-dot" style="background:var(--gold)"></div>gold = where you came from</div>
+  </div>
+  <div id="root-picker"></div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const N = { // NODES
+  // Radicals
+  shui:{id:'shui',char:'水',variant:'氵',py:'shuǐ',en:'water',em:'💧',note:'Becomes 氵on the left side of characters. Appears in almost all water-related words.'},
+  huo: {id:'huo', char:'火',variant:'灬',py:'huǒ', en:'fire', em:'🔥',note:'Becomes 灬(four dots) at the bottom. Stays as 火 on the left side.'},
+  ren: {id:'ren', char:'人',variant:'亻',py:'rén',  en:'person',em:'🧍',note:'Becomes 亻(leaning stroke) on the left side. One of the most common radicals.'},
+  mu:  {id:'mu',  char:'木',variant:'木',py:'mù',   en:'tree/wood',em:'🌳',note:'Mostly unchanged as a component. Appears in furniture, plants, structures.'},
+  kou: {id:'kou', char:'口',variant:'口',py:'kǒu',  en:'mouth',em:'👄',note:'Unchanged as a component. Appears in speech, eating, and sounds.'},
+  nu:  {id:'nu',  char:'女',variant:'女',py:'nǚ',   en:'woman',em:'👩',note:'Unchanged as a component. Appears in family, gender, relationship words.'},
+  xin: {id:'xin', char:'心',variant:'忄',py:'xīn',  en:'heart/mind',em:'❤️',note:'Becomes 忄on the left. Appears in emotions and mental states.'},
+  yan: {id:'yan', char:'言',variant:'讠',py:'yán',  en:'speech',em:'💬',note:'Becomes 讠(simplified) on the left. Appears in speech and language words.'},
+  ri:  {id:'ri',  char:'日',variant:'日',py:'rì',   en:'sun/day',em:'☀️',note:'Unchanged. Appears in time, brightness, and weather words.'},
+  jin: {id:'jin', char:'金',variant:'钅',py:'jīn',  en:'metal/gold',em:'⚙️',note:'Becomes 钅(simplified) on the left. Appears in metals and money.'},
+  men: {id:'men', char:'门',variant:'门',py:'mén',  en:'gate/door',em:'🚪',note:'Can enclose other components. Also a frequent phonetic hint for men/wen sounds.'},
+  shou:{id:'shou',char:'手',variant:'扌',py:'shǒu', en:'hand',em:'✋',note:'Becomes 扌on the left. Appears in hand-action words.'},
+  // Phonetic components (navigable)
+  qing:{id:'qing',char:'青',variant:'青',py:'qīng', en:'blue-green (phonetic)',em:'🟢',note:'Phonetic component giving -ing/-eng sound. Appears in 清,请,晴,情,静 etc.'},
+  mei: {id:'mei', char:'每',variant:'每',py:'měi',  en:'every (phonetic)',em:'🔤',note:'Phonetic component approximating -ei/-ai sounds. Appears in 海,悔,敏.'},
+  ma:  {id:'ma',  char:'马',variant:'马',py:'mǎ',   en:'horse (phonetic)',em:'🐴',note:'Phonetic component giving m- sounds. Also means horse standalone.'},
+  tong:{id:'tong',char:'同',variant:'同',py:'tóng', en:'same (phonetic)',em:'🔤',note:'Phonetic component — exact tóng match. Also means "same/together".'},
+  // Compound characters — water family
+  he:  {id:'he',  char:'河',py:'hé',   en:'river',    em:'🏞️'},
+  hai: {id:'hai', char:'海',py:'hǎi',  en:'sea',      em:'🌊'},
+  hu:  {id:'hu',  char:'湖',py:'hú',   en:'lake',     em:'🏔️'},
+  xi_c:{id:'xi_c',char:'洗',py:'xǐ',   en:'wash',     em:'🧼'},
+  liu: {id:'liu', char:'流',py:'liú',  en:'flow',     em:'🌊'},
+  qing2:{id:'qing2',char:'清',py:'qīng',en:'clear',   em:'✨'},
+  lei: {id:'lei', char:'泪',py:'lèi',  en:'tear',     em:'😢'},
+  han: {id:'han', char:'汗',py:'hàn',  en:'sweat',    em:'💦'},
+  // fire family
+  re:  {id:'re',  char:'热',py:'rè',   en:'hot',      em:'🌡️'},
+  shao:{id:'shao',char:'烧',py:'shāo', en:'burn',     em:'🔥'},
+  chao:{id:'chao',char:'炒',py:'chǎo', en:'stir-fry', em:'🍳'},
+  kao: {id:'kao', char:'烤',py:'kǎo',  en:'roast',    em:'🍖'},
+  deng:{id:'deng',char:'灯',py:'dēng', en:'lamp',     em:'💡'},
+  // person family
+  ni:  {id:'ni',  char:'你',py:'nǐ',   en:'you',      em:'👉'},
+  ta_m:{id:'ta_m',char:'他',py:'tā',   en:'he/him',   em:'🧑'},
+  men2:{id:'men2',char:'们',py:'men',  en:'plural',   em:'👥'},
+  xiu: {id:'xiu', char:'休',py:'xiū',  en:'rest',     em:'😌'},
+  zuo: {id:'zuo', char:'做',py:'zuò',  en:'do/make',  em:'🛠️'},
+  // wood family
+  zhuo:{id:'zhuo',char:'桌',py:'zhuō', en:'table',    em:'🪑'},
+  yi2: {id:'yi2', char:'椅',py:'yǐ',   en:'chair',    em:'🪑'},
+  chuang:{id:'chuang',char:'床',py:'chuáng',en:'bed', em:'🛏️'},
+  lin: {id:'lin', char:'林',py:'lín',  en:'grove',    em:'🌲🌲'},
+  sen: {id:'sen', char:'森',py:'sēn',  en:'forest',   em:'🌲🌲🌲'},
+  // mouth family
+  chi: {id:'chi', char:'吃',py:'chī',  en:'eat',      em:'🍴'},
+  he2: {id:'he2', char:'喝',py:'hē',   en:'drink',    em:'🥤'},
+  chang:{id:'chang',char:'唱',py:'chàng',en:'sing',   em:'🎵'},
+  wen: {id:'wen', char:'问',py:'wèn',  en:'ask',      em:'❓'},
+  ma2: {id:'ma2', char:'吗',py:'ma',   en:'question particle',em:'🔤'},
+  // heart family
+  xiang:{id:'xiang',char:'想',py:'xiǎng',en:'think/want',em:'💭'},
+  mang:{id:'mang',char:'忙',py:'máng', en:'busy',     em:'😤'},
+  wang:{id:'wang',char:'忘',py:'wàng', en:'forget',   em:'💨'},
+  pa:  {id:'pa',  char:'怕',py:'pà',   en:'fear',     em:'😱'},
+  kuai:{id:'kuai',char:'快',py:'kuài', en:'fast/happy',em:'⚡'},
+  // speech family
+  shuo:{id:'shuo',char:'说',py:'shuō', en:'speak',    em:'💬'},
+  hua: {id:'hua', char:'话',py:'huà',  en:'words',    em:'📢'},
+  qing3:{id:'qing3',char:'请',py:'qǐng',en:'please',  em:'🙏'},
+  xie: {id:'xie', char:'谢',py:'xiè',  en:'thank',    em:'🙏'},
+  yu:  {id:'yu',  char:'语',py:'yǔ',   en:'language', em:'🌐'},
+  // sun family
+  ming:{id:'ming',char:'明',py:'míng', en:'bright',   em:'✨'},
+  shi2:{id:'shi2',char:'时',py:'shí',  en:'time',     em:'⏰'},
+  qing4:{id:'qing4',char:'晴',py:'qíng',en:'sunny',   em:'☀️'},
+  zao: {id:'zao', char:'早',py:'zǎo',  en:'early/morning',em:'🌅'},
+  xing:{id:'xing',char:'星',py:'xīng', en:'star',     em:'⭐'},
+  // metal family
+  qian:{id:'qian',char:'钱',py:'qián', en:'money',    em:'💰'},
+  yin: {id:'yin', char:'银',py:'yín',  en:'silver',   em:'🥈'},
+  tong2:{id:'tong2',char:'铜',py:'tóng',en:'copper',  em:'🟤'},
+  zhong:{id:'zhong',char:'钟',py:'zhōng',en:'bell/clock',em:'🔔'},
+  // woman family
+  ma3: {id:'ma3', char:'妈',py:'mā',   en:'mother',   em:'👩'},
+  jie: {id:'jie', char:'姐',py:'jiě',  en:'older sister',em:'👩'},
+  hao: {id:'hao', char:'好',py:'hǎo',  en:'good',     em:'👍'},
+  hun: {id:'hun', char:'婚',py:'hūn',  en:'marry',    em:'💍'},
+  // gate family
+  jian2:{id:'jian2',char:'间',py:'jiān',en:'room/between',em:'🪟'},
+  wen2:{id:'wen2',char:'闻',py:'wén',  en:'hear/smell',em:'👂'},
+  bi:  {id:'bi',  char:'闭',py:'bì',   en:'close',    em:'🚪'},
+  // hand family
+  da:  {id:'da',  char:'打',py:'dǎ',   en:'hit/do',   em:'👊'},
+  zhao:{id:'zhao',char:'找',py:'zhǎo', en:'look for', em:'🔍'},
+  tui: {id:'tui', char:'推',py:'tuī',  en:'push',     em:'👐'},
+  la:  {id:'la',  char:'拉',py:'lā',   en:'pull',     em:'🤲'},
+  na:  {id:'na',  char:'拿',py:'ná',   en:'take/hold',em:'✊'},
+  // phrases
+  p1:{id:'p1',char:'白开水',py:'bái kāi shuǐ',en:'boiled water',em:'🫗',isPhrase:true,note:'The most common drink in China — plain boiled water. 白(white)+开(open)+水(water).'},
+  p2:{id:'p2',char:'喝水',  py:'hē shuǐ',     en:'drink water', em:'💧',isPhrase:true,note:'The simplest instruction. 喝(drink)+水(water).'},
+  p3:{id:'p3',char:'每天',  py:'měi tiān',     en:'every day',   em:'📅',isPhrase:true,note:'每(every)+天(day). Extremely common time expression.'},
+  p4:{id:'p4',char:'开心',  py:'kāi xīn',      en:'happy',       em:'😊',isPhrase:true,note:'开(open)+心(heart) = open-hearted = happy. A very common expression.'},
+  p5:{id:'p5',char:'说话',  py:'shuō huà',     en:'speak/talk',  em:'🗣️',isPhrase:true,note:'说(say)+话(words) = to speak. The compound verb for talking.'},
+  // ── NEW RADICALS ──
+  mu2: {id:'mu2',char:'目',variant:'目', py:'mù',  en:'eye',        em:'👁', note:'Eye radical. Appears in vision, looking, and facial feature words. Unchanged as component.'},
+  shi3:{id:'shi3',char:'食',variant:'饣',py:'shí', en:'food/eat',   em:'🍚', note:'Food radical. Becomes 饣(simplified) on the left. Appears in food, hunger, and nutrition words.'},
+  cao: {id:'cao', char:'草',variant:'艹',py:'cǎo', en:'grass/plant',em:'🌿', note:'Plant/grass radical. Appears at the TOP of characters as 艹. Appears in plant and nature words.'},
+  mian:{id:'mian',char:'宀',variant:'宀',py:'mián',en:'roof',       em:'🏠', note:'Roof radical — appears at top of characters as a little roof shape. Appears in shelter and home words.'},
+  zou: {id:'zou', char:'走',variant:'走',py:'zǒu', en:'walk/run',  em:'🚶', note:'Walk/run radical. Appears at bottom/left of movement words. Related to going and leaving.'},
+  shi4:{id:'shi4',char:'石',variant:'石',py:'shí', en:'stone/rock', em:'🪨', note:'Stone radical. Appears in mineral, hard, and geological words. Unchanged as component.'},
+  tian:{id:'tian',char:'田',variant:'田',py:'tián',en:'field',      em:'🌾', note:'Field radical. Looks like a divided rice field. Appears in farming and boundary words.'},
+  zhu2:{id:'zhu2',char:'竹',variant:'⺮',py:'zhú', en:'bamboo',    em:'🎋', note:'Bamboo radical. Appears at top as ⺮. Found in writing tools, music instruments, and containers.'},
+  // ── EYE family ──
+  kan: {id:'kan', char:'看',py:'kàn',  en:'look/watch',  em:'👀'},
+  jing:{id:'jing',char:'睛',py:'jīng', en:'eyeball',     em:'👁'},
+  mang2:{id:'mang2',char:'盲',py:'máng',en:'blind',      em:'🙈'},
+  xiang2:{id:'xiang2',char:'相',py:'xiāng',en:'appearance',em:'🪞'},
+  // ── FOOD/饣 family ──
+  e2: {id:'e2',  char:'饿',py:'è',    en:'hungry',       em:'😫'},
+  bao2:{id:'bao2',char:'饱',py:'bǎo', en:'full',         em:'😌'},
+  can: {id:'can', char:'餐',py:'cān', en:'meal',         em:'🍽'},
+  yang2:{id:'yang2',char:'养',py:'yǎng',en:'nourish',   em:'🌱'},
+  // ── PLANT/艹 family ──
+  hua2:{id:'hua2',char:'花',py:'huā', en:'flower',       em:'🌸'},
+  cai2:{id:'cai2',char:'菜',py:'cài', en:'vegetable',    em:'🥦'},
+  cha2:{id:'cha2',char:'茶',py:'chá', en:'tea',          em:'🍵'},
+  cao2:{id:'cao2',char:'草',py:'cǎo', en:'grass',        em:'🌿'},
+  ying:{id:'ying',char:'英',py:'yīng',en:'hero/England', em:'🌺'},
+  // ── ROOF/宀 family ──
+  jia: {id:'jia', char:'家',py:'jiā', en:'home/family',  em:'🏠'},
+  an:  {id:'an',  char:'安',py:'ān',  en:'peace/safe',   em:'☮'},
+  shi5:{id:'shi5',char:'室',py:'shì', en:'room',         em:'🛋'},
+  ke2: {id:'ke2', char:'客',py:'kè',  en:'guest',        em:'🤝'},
+  gong2:{id:'gong2',char:'宫',py:'gōng',en:'palace',     em:'🏯'},
+  // ── WALK/走 family ──
+  pao: {id:'pao', char:'跑',py:'pǎo', en:'run',          em:'🏃'},
+  tiao:{id:'tiao',char:'跳',py:'tiào',en:'jump',         em:'🦘'},
+  lu2: {id:'lu2', char:'路',py:'lù',  en:'road/path',    em:'🛣'},
+  jiao2:{id:'jiao2',char:'脚',py:'jiǎo',en:'foot',       em:'🦶'},
+  // ── STONE/石 family ──
+  po:  {id:'po',  char:'破',py:'pò',  en:'break/broken', em:'💥'},
+  yan2:{id:'yan2',char:'研',py:'yán', en:'research',     em:'🔬'},
+  pao2:{id:'pao2',char:'炮',py:'pào', en:'cannon',       em:'💣'},
+  // ── FIELD/田 family ──
+  nan2:{id:'nan2',char:'男',py:'nán', en:'male/man',     em:'👨'},
+  lue: {id:'lue', char:'略',py:'lüè', en:'strategy',     em:'📋'},
+  jie3:{id:'jie3',char:'界',py:'jiè', en:'boundary/world',em:'🌍'},
+  // ── BAMBOO/竹 family ──
+  bi2: {id:'bi2', char:'笔',py:'bǐ',  en:'pen/pencil',   em:'✏'},
+  zhi3:{id:'zhi3',char:'纸',py:'zhǐ', en:'paper',        em:'📄'},
+  deng2:{id:'deng2',char:'等',py:'děng',en:'wait/equal', em:'⏳'},
+  ji2: {id:'ji2', char:'籍',py:'jí',  en:'records',      em:'📚'},
+};
+
+// BREAKDOWN: left+right component data for each compound
+const BD = {
+  he:  {l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'可',rid:null,  ren:'kě — phonetic',  rr:'phonetic', note:'氵(water) + 可(kě) ≈ hé. A flowing body of water.'},
+  hai: {l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'每',rid:'mei', ren:'měi — phonetic', rr:'phonetic', note:'氵(water) + 每(měi) ≈ hǎi. The great water.'},
+  hu:  {l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'胡',rid:null,  ren:'hú — exact match!',rr:'phonetic',note:'氵(water) + 胡(hú) — perfect sound match. Enclosed still water.'},
+  xi_c:{l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'先',rid:null,  ren:'xiān — phonetic',rr:'phonetic', note:'氵(water) + 先(first/before). You wash before other things.'},
+  liu: {l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'㐬',rid:null,  ren:'liú — phonetic', rr:'phonetic', note:'氵(water) + phonetic 㐬. Water in continuous motion.'},
+  qing2:{l:'氵',lid:'shui',len:'water 💧',   lr:'semantic', r:'青',rid:'qing',ren:'qīng — EXACT! ✓',rr:'phonetic', note:'氵(water) + 青(qīng) — perfect sound match. Pure, clear water.'},
+  lei: {l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'目',rid:null,  ren:'mù — eye 👁',    rr:'semantic', note:'氵(water) + 目(eye). Both semantic! Water from the eye = tear.'},
+  han: {l:'氵',lid:'shui',len:'water 💧',    lr:'semantic', r:'干',rid:null,  ren:'gān — phonetic', rr:'phonetic', note:'氵(water) + 干(dry, gān) ≈ hàn. Ironic: sweat is water from dryness.'},
+  re:  {l:'执', lid:null, len:'zhí — hold',  lr:'phonetic', r:'灬',rid:'huo', ren:'fire 🔥 below',  rr:'semantic', note:'执(hold,zhí) + 灬(fire below) — fire held below = heat rising up.'},
+  shao:{l:'火', lid:'huo',len:'fire 🔥',     lr:'semantic', r:'尧',rid:null,  ren:'yáo — phonetic', rr:'phonetic', note:'火(fire) + 尧 ≈ shāo. Fire applied to something.'},
+  chao:{l:'火', lid:'huo',len:'fire 🔥',     lr:'semantic', r:'少',rid:null,  ren:'shǎo — phonetic',rr:'phonetic', note:'火(fire) + 少(few,shǎo) ≈ chǎo. Quick flash of heat cooking.'},
+  kao: {l:'火', lid:'huo',len:'fire 🔥',     lr:'semantic', r:'考',rid:null,  ren:'kǎo — EXACT! ✓', rr:'phonetic', note:'火(fire) + 考(exam,kǎo) — perfect match! Note: 考试 = exam uses same kǎo.'},
+  deng:{l:'火', lid:'huo',len:'fire 🔥',     lr:'semantic', r:'丁',rid:null,  ren:'dīng — phonetic',rr:'phonetic', note:'火(fire) + 丁(dīng) ≈ dēng. Originally an oil lamp.'},
+  ni:  {l:'亻', lid:'ren',len:'person 🧍',   lr:'semantic', r:'尔',rid:null,  ren:'ěr — archaic "you"',rr:'both',  note:'亻(person) + 尔(archaic "you"). Right side is both semantic AND phonetic.'},
+  ta_m:{l:'亻', lid:'ren',len:'person 🧍',   lr:'semantic', r:'也',rid:null,  ren:'yě — phonetic',  rr:'phonetic', note:'亻(person) + 也(yě) ≈ tā. yě→tā in older pronunciation. Male pronoun.'},
+  men2:{l:'亻', lid:'ren',len:'person 🧍',   lr:'semantic', r:'门',rid:'men', ren:'mén — exact! ✓', rr:'phonetic', note:'亻(person) + 门(mén) — 门 gives men sound perfectly. Plural for people.'},
+  xiu: {l:'亻', lid:'ren',len:'person 🧍',   lr:'semantic', r:'木',rid:'mu',  ren:'tree 🌳',         rr:'semantic', note:'亻(person) + 木(tree). Both semantic! A person resting against a tree.'},
+  zuo: {l:'亻', lid:'ren',len:'person 🧍',   lr:'semantic', r:'故',rid:null,  ren:'gù — phonetic',  rr:'phonetic', note:'亻(person) + 故(gù) ≈ zuò. A person doing or making something.'},
+  zhuo:{l:'木', lid:'mu', len:'wood 🌳',     lr:'semantic', r:'卓',rid:null,  ren:'zhuó — phonetic',rr:'phonetic', note:'木(wood) + 卓(outstanding,zhuó) ≈ zhuō. A wooden surface.'},
+  yi2: {l:'木', lid:'mu', len:'wood 🌳',     lr:'semantic', r:'奇',rid:null,  ren:'qí — phonetic',  rr:'phonetic', note:'木(wood) + 奇(qí) ≈ yǐ. A wooden seat.'},
+  chuang:{l:'木',lid:'mu',len:'wood 🌳',     lr:'semantic', r:'爿',rid:null,  ren:'qiáng — phonetic',rr:'phonetic',note:'木(wood) in 广(shelter) — a wooden frame beneath a roof.'},
+  lin: {l:'木', lid:'mu', len:'wood 🌳',     lr:'semantic', r:'木',rid:'mu',  ren:'another tree 🌳',rr:'semantic', note:'木 + 木 — two trees = a grove. Pure logical doubling!'},
+  sen: {l:'木', lid:'mu', len:'wood 🌳',     lr:'semantic', r:'木+木',rid:'mu',ren:'two more 🌲🌲',  rr:'semantic', note:'Three 木 = dense forest. The most literal character in Chinese.'},
+  chi: {l:'口', lid:'kou',len:'mouth 👄',    lr:'semantic', r:'乞',rid:null,  ren:'qǐ — phonetic',  rr:'phonetic', note:'口(mouth) + 乞(beg,qǐ) ≈ chī. Mouth action of eating.'},
+  he2: {l:'口', lid:'kou',len:'mouth 👄',    lr:'semantic', r:'曷',rid:null,  ren:'hé — phonetic',  rr:'phonetic', note:'口(mouth) + 曷(hé). A mouth action: drinking.'},
+  chang:{l:'口',lid:'kou',len:'mouth 👄',    lr:'semantic', r:'昌',rid:null,  ren:'chāng — phonetic',rr:'phonetic',note:'口(mouth) + 昌(chāng) ≈ chàng. Sound projecting from the mouth.'},
+  wen: {l:'口', lid:'kou',len:'mouth 👄',    lr:'semantic', r:'门',rid:'men', ren:'mén — phonetic', rr:'phonetic', note:'口(mouth) + 门(mén) ≈ wèn. Asking at a door with your mouth.'},
+  ma2: {l:'口', lid:'kou',len:'mouth 👄',    lr:'semantic', r:'马',rid:'ma',  ren:'mǎ — phonetic',  rr:'phonetic', note:'口(mouth) + 马(horse,mǎ) gives the m-sound. Spoken question marker.'},
+  xiang:{l:'心',lid:'xin',len:'heart ❤️',   lr:'semantic', r:'相',rid:null,  ren:'xiāng — phonetic',rr:'phonetic',note:'心(heart) at bottom + 相(mutual,xiāng) ≈ xiǎng. Wanting from the heart.'},
+  mang:{l:'忄', lid:'xin',len:'heart ❤️',   lr:'semantic', r:'亡',rid:null,  ren:'wáng — phonetic',rr:'phonetic', note:'忄(heart) + 亡(perish,wáng) ≈ máng. Losing your heart = frantic busyness.'},
+  wang:{l:'心', lid:'xin',len:'heart ❤️',   lr:'semantic', r:'亡',rid:null,  ren:'wáng — phonetic',rr:'phonetic', note:'亡(perish) + 心(heart). To lose from the heart = forget.'},
+  pa:  {l:'忄', lid:'xin',len:'heart ❤️',   lr:'semantic', r:'白',rid:null,  ren:'bái — phonetic', rr:'phonetic', note:'忄(heart) + 白(white,bái) ≈ pà. White-hearted with fear.'},
+  kuai:{l:'忄', lid:'xin',len:'heart ❤️',   lr:'semantic', r:'夬',rid:null,  ren:'guài — phonetic',rr:'phonetic', note:'忄(heart) + 夬 ≈ kuài. The heart leaping = fast or happy.'},
+  shuo:{l:'讠', lid:'yan',len:'speech 💬',   lr:'semantic', r:'兑',rid:null,  ren:'duì — phonetic', rr:'phonetic', note:'讠(speech) + 兑(duì) ≈ shuō. The act of speaking.'},
+  hua: {l:'讠', lid:'yan',len:'speech 💬',   lr:'semantic', r:'舌',rid:null,  ren:'shé — tongue 👅',rr:'both',     note:'讠(speech) + 舌(tongue). Both semantic! Speech made with the tongue.'},
+  qing3:{l:'讠',lid:'yan',len:'speech 💬',   lr:'semantic', r:'青',rid:'qing',ren:'qīng — phonetic',rr:'phonetic', note:'讠(speech) + 青(qīng) ≈ qǐng. A polite spoken request.'},
+  xie: {l:'讠', lid:'yan',len:'speech 💬',   lr:'semantic', r:'射',rid:null,  ren:'shè — phonetic', rr:'phonetic', note:'讠(speech) + 射(shoot,shè) ≈ xiè. A spoken expression of thanks.'},
+  yu:  {l:'讠', lid:'yan',len:'speech 💬',   lr:'semantic', r:'吾',rid:null,  ren:'wú — phonetic',  rr:'phonetic', note:'讠(speech) + 吾(I/me classical,wú) ≈ yǔ. The spoken language.'},
+  ming:{l:'日', lid:'ri',  len:'sun ☀️',     lr:'semantic', r:'月',rid:null,  ren:'moon 🌙 — semantic',rr:'semantic',note:'日(sun) + 月(moon). Both semantic! Sun AND moon = brilliant brightness.'},
+  shi2:{l:'日', lid:'ri',  len:'sun ☀️',     lr:'semantic', r:'寺',rid:null,  ren:'sì — phonetic',  rr:'phonetic', note:'日(sun) + 寺(temple,sì) ≈ shí. The sun marks time like a temple bell.'},
+  qing4:{l:'日',lid:'ri',  len:'sun ☀️',     lr:'semantic', r:'青',rid:'qing',ren:'qīng — phonetic',rr:'phonetic', note:'日(sun) + 青(qīng) ≈ qíng. A blue-sky sunny day.'},
+  zao: {l:'日', lid:'ri',  len:'sun ☀️',     lr:'semantic', r:'十',rid:null,  ren:'shí — horizon',  rr:'semantic', note:'日(sun) above 十(a horizontal line = horizon). Sun just rising = early!'},
+  xing:{l:'日', lid:'ri',  len:'light source',lr:'semantic', r:'生',rid:null,  ren:'shēng — phonetic',rr:'phonetic',note:'日(light) + 生(born,shēng) ≈ xīng. Lights born in the sky = stars.'},
+  qian:{l:'钅', lid:'jin',len:'metal ⚙️',    lr:'semantic', r:'戋',rid:null,  ren:'jiān — phonetic',rr:'phonetic', note:'钅(metal) + 戋 ≈ qián. Coins are made of metal.'},
+  yin: {l:'钅', lid:'jin',len:'metal ⚙️',    lr:'semantic', r:'艮',rid:null,  ren:'gèn — phonetic', rr:'phonetic', note:'钅(metal) + 艮(gèn) ≈ yín. A silver-white metal.'},
+  tong2:{l:'钅',lid:'jin',len:'metal ⚙️',    lr:'semantic', r:'同',rid:'tong',ren:'tóng — EXACT! ✓',rr:'phonetic', note:'钅(metal) + 同(tóng) — perfect match! A reddish-brown metal.'},
+  zhong:{l:'钅',lid:'jin',len:'metal ⚙️',    lr:'semantic', r:'中',rid:null,  ren:'zhōng — phonetic',rr:'phonetic',note:'钅(metal) + 中(middle,zhōng) — a metal bell struck in the middle.'},
+  ma3: {l:'女', lid:'nu',  len:'woman 👩',    lr:'semantic', r:'马',rid:'ma',  ren:'mǎ — phonetic',  rr:'phonetic', note:'女(woman) + 马(horse,mǎ) ≈ mā. Mǎ gives the m-sound. Mother.'},
+  jie: {l:'女', lid:'nu',  len:'woman 👩',    lr:'semantic', r:'且',rid:null,  ren:'qiě — phonetic', rr:'phonetic', note:'女(woman) + 且(qiě) ≈ jiě. Elder female sibling.'},
+  hao: {l:'女', lid:'nu',  len:'woman 👩',    lr:'semantic', r:'子',rid:null,  ren:'zǐ — child 👶',  rr:'semantic', note:'女(woman) + 子(child). Both semantic! Woman with child = good, harmonious.'},
+  hun: {l:'女', lid:'nu',  len:'woman 👩',    lr:'semantic', r:'昏',rid:null,  ren:'hūn — EXACT! ✓', rr:'phonetic', note:'女(woman) + 昏(dusk,hūn) — perfect match! Weddings held at dusk.'},
+  jian2:{l:'门',lid:'men',len:'gate 🚪',     lr:'semantic', r:'日',rid:'ri',  ren:'sun ☀️ — semantic',rr:'semantic',note:'日(sun) inside 门(gate) — sunlight through a crack = space/room/interval.'},
+  wen2:{l:'门', lid:'men',len:'gate 🚪',     lr:'semantic', r:'耳',rid:null,  ren:'ěr — ear 👂',     rr:'semantic', note:'耳(ear) inside 门(gate) — ear pressed to a gate. Both semantic! To hear/smell.'},
+  bi:  {l:'门', lid:'men',len:'gate 🚪',     lr:'semantic', r:'才',rid:null,  ren:'cái — phonetic',  rr:'phonetic', note:'门(gate) + 才(cái) ≈ bì. Shutting a gate.'},
+  da:  {l:'扌', lid:'shou',len:'hand ✋',    lr:'semantic', r:'丁',rid:null,  ren:'dīng — phonetic', rr:'phonetic', note:'扌(hand) + 丁(dīng) ≈ dǎ. Striking or doing with the hand.'},
+  zhao:{l:'扌', lid:'shou',len:'hand ✋',    lr:'semantic', r:'戈',rid:null,  ren:'gē — phonetic',   rr:'phonetic', note:'扌(hand) + 戈(spear,gē) ≈ zhǎo. Searching with hands extended.'},
+  tui: {l:'扌', lid:'shou',len:'hand ✋',    lr:'semantic', r:'隹',rid:null,  ren:'zhuī — phonetic', rr:'phonetic', note:'扌(hand) + 隹(bird,zhuī) ≈ tuī. Pushing with the hand.'},
+  la:  {l:'扌', lid:'shou',len:'hand ✋',    lr:'semantic', r:'立',rid:null,  ren:'lì — phonetic',   rr:'phonetic', note:'扌(hand) + 立(stand,lì) ≈ lā. Pulling with the hand.'},
+  na:  {l:'合', lid:null,  len:'hé — combine',lr:'phonetic', r:'手',rid:'shou',ren:'hand ✋',          rr:'semantic', note:'合(combine,hé) + 手(hand) at bottom. Hands combined to grasp = take/hold.'},
+  // eye family
+  kan:   {l:'手',lid:'shou',len:'hand ✋',      lr:'semantic', r:'目',rid:'mu2', ren:'eye 👁️ — semantic', rr:'semantic', note:'手(hand) shading 目(eye) — a person shading their eyes to look. Both semantic!'},
+  jing:  {l:'目',lid:'mu2', len:'eye 👁️',       lr:'semantic', r:'青',rid:'qing',ren:'qīng — phonetic',  rr:'phonetic', note:'目(eye) + 青(qīng) ≈ jīng. The eyeball — the clear part.'},
+  mang2: {l:'亡',lid:null,  len:'wáng — perish',lr:'phonetic', r:'目',rid:'mu2', ren:'eye 👁️ — semantic', rr:'semantic', note:'亡(perish,wáng) ≈ máng + 目(eye). To have perished sight = blind.'},
+  xiang2:{l:'木',lid:'mu',  len:'tree 🌳',       lr:'semantic', r:'目',rid:'mu2', ren:'eye 👁️ — semantic', rr:'semantic', note:'木(tree) + 目(eye) — looking at a tree = appearance/image. Both semantic!'},
+  // food family
+  e2:    {l:'饣',lid:'shi3',len:'food 🍚',       lr:'semantic', r:'我',rid:null,  ren:'wǒ — phonetic',   rr:'phonetic', note:'饣(food) + 我(I/me,wǒ) ≈ è. Lack of food = hunger.'},
+  bao2:  {l:'饣',lid:'shi3',len:'food 🍚',       lr:'semantic', r:'包',rid:null,  ren:'bāo — phonetic',  rr:'phonetic', note:'饣(food) + 包(wrap,bāo) ≈ bǎo. Food filling you up = satisfied/full.'},
+  can:   {l:'食',lid:'shi3',len:'food 🍚',       lr:'semantic', r:'攵',rid:null,  ren:'shé — phonetic',  rr:'phonetic', note:'食(food) + 攵 — a formal arranged meal.'},
+  yang2: {l:'羊',lid:null,  len:'yáng — sheep',  lr:'phonetic', r:'食',rid:'shi3',ren:'food 🍚 — semantic',rr:'semantic', note:'羊(sheep,yáng) ≈ yǎng + 食(food). To nourish/raise with food.'},
+  // plant family
+  hua2:  {l:'艹',lid:'cao', len:'plant 🌿',      lr:'semantic', r:'化',rid:null,  ren:'huà — phonetic',  rr:'phonetic', note:'艹(plant) + 化(transform,huà) ≈ huā. A blooming plant = flower.'},
+  cai2:  {l:'艹',lid:'cao', len:'plant 🌿',      lr:'semantic', r:'采',rid:null,  ren:'cǎi — phonetic',  rr:'phonetic', note:'艹(plant) + 采(pick,cǎi) ≈ cài. Pickable plants = vegetables/dishes.'},
+  cha2:  {l:'艹',lid:'cao', len:'plant 🌿',      lr:'semantic', r:'余',rid:null,  ren:'yú — phonetic',   rr:'phonetic', note:'艹(plant) + 余(remainder,yú) ≈ chá. A plant steeped in water = tea.'},
+  cao2:  {l:'艹',lid:'cao', len:'plant 🌿',      lr:'semantic', r:'早',rid:null,  ren:'zǎo — phonetic',  rr:'phonetic', note:'艹(plant) + 早(early,zǎo) ≈ cǎo. Early-growing low plants = grass.'},
+  ying:  {l:'艹',lid:'cao', len:'plant 🌿',      lr:'semantic', r:'央',rid:null,  ren:'yāng — phonetic', rr:'phonetic', note:'艹(plant) + 央(center,yāng) ≈ yīng. A flowering plant = hero; also phonetic for England.'},
+  // roof family
+  jia:   {l:'宀',lid:'mian',len:'roof 🏠',       lr:'semantic', r:'豕',rid:null,  ren:'shǐ — pig 🐷',    rr:'semantic', note:'宀(roof) + 豕(pig) — a roof over a pig = home! Ancient families kept pigs indoors.'},
+  an:    {l:'宀',lid:'mian',len:'roof 🏠',       lr:'semantic', r:'女',rid:'nu',  ren:'woman 👩 — semantic',rr:'semantic',note:'宀(roof) + 女(woman) — woman under a roof = peace/safety. Both semantic!'},
+  shi5:  {l:'宀',lid:'mian',len:'roof 🏠',       lr:'semantic', r:'至',rid:null,  ren:'zhì — phonetic',  rr:'phonetic', note:'宀(roof) + 至(arrive,zhì) ≈ shì. The place you arrive at = room.'},
+  ke2:   {l:'宀',lid:'mian',len:'roof 🏠',       lr:'semantic', r:'各',rid:null,  ren:'gè — phonetic',   rr:'phonetic', note:'宀(roof) + 各(each,gè) ≈ kè. One who comes under another\'s roof = guest.'},
+  gong2: {l:'宀',lid:'mian',len:'roof 🏠',       lr:'semantic', r:'躬',rid:null,  ren:'gōng — phonetic', rr:'phonetic', note:'宀(roof) + 躬(body,gōng) — a great impressive roof structure = palace.'},
+  // walk family
+  pao:   {l:'足',lid:'zou', len:'foot 🚶',       lr:'semantic', r:'包',rid:null,  ren:'bāo — phonetic',  rr:'phonetic', note:'足(foot, from 走) + 包(bāo) ≈ pǎo. Foot moving fast = run.'},
+  tiao:  {l:'足',lid:'zou', len:'foot 🚶',       lr:'semantic', r:'兆',rid:null,  ren:'zhào — phonetic', rr:'phonetic', note:'足(foot) + 兆(omen,zhào) ≈ tiào. Foot leaving the ground = jump.'},
+  lu2:   {l:'足',lid:'zou', len:'foot 🚶',       lr:'semantic', r:'各',rid:null,  ren:'gè — phonetic',   rr:'phonetic', note:'足(foot) + 各(each,gè) ≈ lù. Where each foot goes = road/path.'},
+  jiao2: {l:'足',lid:'zou', len:'foot 🚶',       lr:'semantic', r:'卩',rid:null,  ren:'jié — phonetic',  rr:'phonetic', note:'足(foot) + 卩 ≈ jiǎo. The foot itself — the organ of walking.'},
+  // stone family
+  po:    {l:'石',lid:'shi4',len:'stone 🪨',      lr:'semantic', r:'皮',rid:null,  ren:'pí — phonetic',   rr:'phonetic', note:'石(stone) + 皮(skin,pí) ≈ pò. Stone breaking through = broken.'},
+  yan2:  {l:'石',lid:'shi4',len:'stone 🪨',      lr:'semantic', r:'开',rid:null,  ren:'kāi — phonetic',  rr:'phonetic', note:'石(stone) + 开(open,kāi) ≈ yán. Grinding stone open = research.'},
+  pao2:  {l:'火',lid:'huo', len:'fire 🔥',       lr:'semantic', r:'包',rid:null,  ren:'bāo — phonetic',  rr:'phonetic', note:'火(fire) + 包(bāo) ≈ pào. Fire wrapped/packed = cannon/firecracker.'},
+  // field family
+  nan2:  {l:'田',lid:'tian',len:'field 🌾',      lr:'semantic', r:'力',rid:null,  ren:'lì — strength 💪', rr:'semantic', note:'田(field) + 力(strength). Both semantic! Strength in the fields = male.'},
+  lue:   {l:'田',lid:'tian',len:'field 🌾',      lr:'semantic', r:'各',rid:null,  ren:'gè — phonetic',   rr:'phonetic', note:'田(field) + 各(each,gè) ≈ lüè. A brief field plan = strategy.'},
+  jie3:  {l:'田',lid:'tian',len:'field 🌾',      lr:'semantic', r:'介',rid:null,  ren:'jiè — exact! ✓',  rr:'phonetic', note:'田(field) + 介(between,jiè) — perfect match! Boundary between fields = world.'},
+  // bamboo family
+  bi2:   {l:'⺮',lid:'zhu2', len:'bamboo 🎋',     lr:'semantic', r:'聿',rid:null,  ren:'yù — phonetic',   rr:'phonetic', note:'⺮(bamboo) + 聿(writing,yù) ≈ bǐ. A bamboo writing tool = pen/brush.'},
+  zhi3:  {l:'⺮',lid:'zhu2', len:'bamboo 🎋',     lr:'semantic', r:'氏',rid:null,  ren:'shì — phonetic',  rr:'phonetic', note:'⺮(bamboo) + 氏(clan,shì) ≈ zhǐ. Bamboo sheets for writing = paper.'},
+  deng2: {l:'⺮',lid:'zhu2', len:'bamboo 🎋',     lr:'semantic', r:'寺',rid:null,  ren:'sì — phonetic',   rr:'phonetic', note:'⺮(bamboo) + 寺(temple,sì) ≈ děng. Bamboo counting rods = equal/wait.'},
+  ji2:   {l:'⺮',lid:'zhu2', len:'bamboo 🎋',     lr:'semantic', r:'耤',rid:null,  ren:'jí — phonetic',   rr:'phonetic', note:'⺮(bamboo) + 耤 ≈ jí. Bamboo records/registers = book records.'},
+};
+
+// EDGES
+const E = [
+  // water
+  {f:'shui',t:'he',   type:'semantic'},{f:'shui',t:'hai',  type:'semantic'},
+  {f:'shui',t:'hu',   type:'semantic'},{f:'shui',t:'xi_c', type:'semantic'},
+  {f:'shui',t:'liu',  type:'semantic'},{f:'shui',t:'qing2',type:'semantic'},
+  {f:'shui',t:'lei',  type:'semantic'},{f:'shui',t:'han',  type:'semantic'},
+  {f:'shui',t:'p1',   type:'phrase'},  {f:'shui',t:'p2',   type:'phrase'},
+  // fire
+  {f:'huo',t:'re',   type:'semantic'},{f:'huo',t:'shao', type:'semantic'},
+  {f:'huo',t:'chao', type:'semantic'},{f:'huo',t:'kao',  type:'semantic'},
+  {f:'huo',t:'deng', type:'semantic'},
+  // person
+  {f:'ren',t:'ni',   type:'semantic'},{f:'ren',t:'ta_m', type:'semantic'},
+  {f:'ren',t:'men2', type:'semantic'},{f:'ren',t:'xiu',  type:'semantic'},
+  {f:'ren',t:'zuo',  type:'semantic'},
+  // wood
+  {f:'mu', t:'zhuo', type:'semantic'},{f:'mu', t:'yi2',  type:'semantic'},
+  {f:'mu', t:'chuang',type:'semantic'},{f:'mu',t:'lin',  type:'semantic'},
+  {f:'mu', t:'sen',  type:'semantic'},
+  // mouth
+  {f:'kou',t:'chi',  type:'semantic'},{f:'kou',t:'he2',  type:'semantic'},
+  {f:'kou',t:'chang',type:'semantic'},{f:'kou',t:'wen',  type:'semantic'},
+  {f:'kou',t:'ma2',  type:'semantic'},
+  // heart
+  {f:'xin',t:'xiang',type:'semantic'},{f:'xin',t:'mang', type:'semantic'},
+  {f:'xin',t:'wang', type:'semantic'},{f:'xin',t:'pa',   type:'semantic'},
+  {f:'xin',t:'kuai', type:'semantic'},{f:'xin',t:'p4',   type:'phrase'},
+  // speech
+  {f:'yan',t:'shuo', type:'semantic'},{f:'yan',t:'hua',  type:'semantic'},
+  {f:'yan',t:'qing3',type:'semantic'},{f:'yan',t:'xie',  type:'semantic'},
+  {f:'yan',t:'yu',   type:'semantic'},{f:'yan',t:'p5',   type:'phrase'},
+  // sun
+  {f:'ri', t:'ming', type:'semantic'},{f:'ri', t:'shi2', type:'semantic'},
+  {f:'ri', t:'qing4',type:'semantic'},{f:'ri', t:'zao',  type:'semantic'},
+  {f:'ri', t:'xing', type:'semantic'},
+  // metal
+  {f:'jin',t:'qian', type:'semantic'},{f:'jin',t:'yin',  type:'semantic'},
+  {f:'jin',t:'tong2',type:'semantic'},{f:'jin',t:'zhong',type:'semantic'},
+  // woman
+  {f:'nu', t:'ma3',  type:'semantic'},{f:'nu', t:'jie',  type:'semantic'},
+  {f:'nu', t:'hao',  type:'semantic'},{f:'nu', t:'hun',  type:'semantic'},
+  // gate
+  {f:'men',t:'jian2',type:'semantic'},{f:'men',t:'wen2', type:'semantic'},
+  {f:'men',t:'bi',   type:'semantic'},{f:'men',t:'men2', type:'semantic'},
+  {f:'men',t:'wen',  type:'semantic'},
+  // hand
+  {f:'shou',t:'da',  type:'semantic'},{f:'shou',t:'zhao',type:'semantic'},
+  {f:'shou',t:'tui', type:'semantic'},{f:'shou',t:'la',  type:'semantic'},
+  {f:'shou',t:'na',  type:'semantic'},
+  // phonetic 青
+  {f:'qing',t:'qing2',type:'phonetic'},{f:'qing',t:'qing3',type:'phonetic'},
+  {f:'qing',t:'qing4',type:'phonetic'},
+  // phonetic 每
+  {f:'mei',t:'hai',   type:'phonetic'},{f:'mei',t:'p3',    type:'phrase'},
+  // phonetic 马
+  {f:'ma', t:'ma3',   type:'phonetic'},{f:'ma', t:'ma2',   type:'phonetic'},
+  // phonetic 同
+  {f:'tong',t:'tong2',type:'phonetic'},
+  // eye
+  {f:'mu2',t:'kan',   type:'semantic'},{f:'mu2',t:'jing',   type:'semantic'},
+  {f:'mu2',t:'mang2', type:'semantic'},{f:'mu2',t:'xiang2', type:'semantic'},
+  {f:'mu2',t:'lei',   type:'semantic'}, // 泪 has 目 on right
+  // food
+  {f:'shi3',t:'e2',   type:'semantic'},{f:'shi3',t:'bao2',  type:'semantic'},
+  {f:'shi3',t:'can',  type:'semantic'},{f:'shi3',t:'yang2', type:'semantic'},
+  // plant
+  {f:'cao',t:'hua2',  type:'semantic'},{f:'cao',t:'cai2',   type:'semantic'},
+  {f:'cao',t:'cha2',  type:'semantic'},{f:'cao',t:'cao2',   type:'semantic'},
+  {f:'cao',t:'ying',  type:'semantic'},
+  // roof
+  {f:'mian',t:'jia',  type:'semantic'},{f:'mian',t:'an',    type:'semantic'},
+  {f:'mian',t:'shi5', type:'semantic'},{f:'mian',t:'ke2',   type:'semantic'},
+  {f:'mian',t:'gong2',type:'semantic'},
+  // walk
+  {f:'zou',t:'pao',   type:'semantic'},{f:'zou',t:'tiao',   type:'semantic'},
+  {f:'zou',t:'lu2',   type:'semantic'},{f:'zou',t:'jiao2',  type:'semantic'},
+  // stone
+  {f:'shi4',t:'po',   type:'semantic'},{f:'shi4',t:'yan2',  type:'semantic'},
+  {f:'shi4',t:'pao2', type:'semantic'},
+  // field
+  {f:'tian',t:'nan2', type:'semantic'},{f:'tian',t:'lue',   type:'semantic'},
+  {f:'tian',t:'jie3', type:'semantic'},
+  // bamboo
+  {f:'zhu2',t:'bi2',   type:'semantic'},{f:'zhu2',t:'zhi3',   type:'semantic'},
+  {f:'zhu2',t:'deng2', type:'semantic'},{f:'zhu2',t:'ji2',    type:'semantic'},
+  // cross-links
+  {f:'mu2',t:'xiang2',type:'semantic'},{f:'nan2',t:'tian',  type:'semantic'},
+];
+
+const ROOTS = ['shui','huo','ren','mu','kou','nu','xin','yan','ri','jin','men','shou','mu2','shi3','cao','mian','zou','shi4','tian','zhu2'];
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let center = 'shui';
+let history = [];
+let vis = new Set(['meaning','sound','phrase']);
+
+// ── AUDIO ──────────────────────────────────────────────────────────────────
+if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();}
+function speak(t){if(!t||!window.speechSynthesis)return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='zh-CN';u.rate=.85;const v=window.speechSynthesis.getVoices().find(x=>x.lang.startsWith('zh'));if(v)u.voice=v;window.speechSynthesis.speak(u);}
+
+// ── LAYOUT ──────────────────────────────────────────────────────────────────
+function getOrbitItems() {
+  const items = [];
+  const seen = new Set();
+
+  // Breadcrumb trail — last 2 visited nodes, shown dim
+  history.slice(-2).reverse().forEach(id => {
+    if(id !== center && N[id] && !seen.has(id)) {
+      seen.add(id);
+      items.push({nodeId:id, type:'trail'});
+    }
+  });
+
+  // Direct edge neighbors
+  E.forEach(e => {
+    const other = e.f===center ? e.t : e.t===center ? e.f : null;
+    if(!other || !N[other] || seen.has(other)) return;
+    if(e.type==='semantic' && !vis.has('meaning')) return;
+    if(e.type==='phonetic' && !vis.has('sound')) return;
+    if(e.type==='phrase'   && !vis.has('phrase')) return;
+    seen.add(other);
+    items.push({nodeId:other, type:e.type});
+  });
+
+  // If center is a compound, also surface its parent radical(s) and siblings
+  const bd = BD[center];
+  if(bd) {
+    if(bd.lid && N[bd.lid] && !seen.has(bd.lid)) {
+      seen.add(bd.lid); items.push({nodeId:bd.lid, type:'semantic'});
+    }
+    if(bd.rid && N[bd.rid] && !seen.has(bd.rid)) {
+      seen.add(bd.rid); items.push({nodeId:bd.rid, type:'phonetic'});
+    }
+    // Siblings — other compounds sharing the same left radical
+    if(bd.lid) {
+      E.forEach(e => {
+        const sib = e.f===bd.lid ? e.t : e.t===bd.lid ? e.f : null;
+        if(!sib || sib===center || seen.has(sib) || !N[sib]) return;
+        if(e.type==='semantic' && !vis.has('meaning')) return;
+        seen.add(sib);
+        items.push({nodeId:sib, type:'semantic'});
+      });
+    }
+  }
+
+  return items.slice(0, 10);
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────────
+function render(animateFrom) {
+  const wrap = document.getElementById('graph-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const cx = W/2, cy = H * 0.38;
+
+  const svg = document.getElementById('graph-svg');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  wrap.querySelectorAll('.cn,.on').forEach(el => el.remove());
+
+  const items = getOrbitItems();
+  const n = items.length;
+  const radius = Math.min(W, H) * 0.32;
+  const step = (Math.PI*2) / Math.max(n, 1);
+
+  items.forEach((item, i) => {
+    const angle = -Math.PI/2 + i * step;
+    const ox = cx + radius * Math.cos(angle);
+    const oy = cy + radius * Math.sin(angle);
+    const node = N[item.nodeId];
+    if(!node) return;
+
+    // Edge
+    const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1', cx); ln.setAttribute('y1', cy);
+    ln.setAttribute('x2', ox); ln.setAttribute('y2', oy);
+    ln.setAttribute('class',
+      item.type==='trail'    ? 'e-trail' :
+      item.type==='semantic' ? 'e-sem' :
+      item.type==='phonetic' ? 'e-phon' : 'e-phrase');
+    svg.appendChild(ln);
+
+    // Orbit node
+    const el = document.createElement('div');
+    el.className = 'on'
+      + (item.type==='phrase' ? ' phrase' : '')
+      + (item.type==='trail'  ? ' trail'  : '');
+
+    const sx = animateFrom ? animateFrom.x : ox;
+    const sy = animateFrom ? animateFrom.y : oy;
+    el.style.cssText = `left:${sx}px;top:${sy}px;opacity:0;`;
+
+    const tc = item.type==='semantic' ? 'var(--sem)'
+             : item.type==='phonetic' ? 'var(--phon)'
+             : item.type==='phrase'   ? 'var(--phrase)'
+             : item.type==='trail'    ? 'var(--gold)'
+             : 'var(--muted)';
+    const cc = item.type==='trail' ? 'var(--gold)' : item.type==='semantic' ? '#fff' : tc;
+
+    el.innerHTML = `
+      <div class="on-bubble" style="border-color:${item.type==='trail'?'var(--dim)':tc}">
+        <div class="on-char" style="color:${cc}">${node.char}</div>
+        <div class="on-py" style="color:${tc}">${node.py}</div>
+        <div class="on-en">${node.en}</div>
+      </div>`;
+
+    el.onclick = () => { history.push(center); center = item.nodeId; render({x:ox,y:oy}); };
+    wrap.appendChild(el);
+
+    requestAnimationFrame(() => {
+      el.style.transition = `left .4s cubic-bezier(.34,1.2,.64,1), top .4s cubic-bezier(.34,1.2,.64,1), opacity .25s ${i*0.025}s`;
+      el.style.left = ox + 'px';
+      el.style.top  = oy + 'px';
+      el.style.opacity = item.type==='trail' ? '0.4' : '1';
+    });
+  });
+
+  // Center node
+  const cnode = N[center];
+  if(cnode) {
+    const cel = document.createElement('div');
+    cel.className = 'cn';
+    cel.style.cssText = `left:${cx}px;top:${cy}px;`;
+    const variant = cnode.variant && cnode.variant !== cnode.char
+      ? `<div class="cn-variant">${cnode.char}→${cnode.variant} in compounds</div>` : '';
+    cel.innerHTML = `
+      <div class="cn-char" onclick="speak(N[center]?.char)">${cnode.em||''} ${cnode.char}</div>
+      <div class="cn-below">
+        ${variant}
+        <div class="cn-py">${cnode.py}</div>
+        <div class="cn-en">${cnode.en}</div>
+      </div>`;
+    wrap.appendChild(cel);
+    speak(cnode.char);
+  }
+
+  renderInfoStrip();
+  document.getElementById('back-btn').classList.toggle('show', history.length > 0);
+
+  // Break button — only shown when center has a breakdown
+  const bb = document.getElementById('break-btn');
+  if(BD[center]) {
+    bb.classList.add('visible');
+    bb.style.left = cx + 'px';
+    bb.style.top  = (cy - clamp(80, 14, 120)) + 'px';
+  } else {
+    bb.classList.remove('visible');
+  }
+  closeSplit();
+  renderRootPicker();
+}
+
+function clamp(base, vw, max) {
+  return Math.min(max, Math.max(base, window.innerWidth * vw / 100));
+}
+
+// ── INFO STRIP — always shows breakdown for current center ─────────────────
+function renderInfoStrip() {
+  let strip = document.getElementById('info-strip');
+  if(!strip) {
+    strip = document.createElement('div');
+    strip.id = 'info-strip';
+    document.getElementById('graph-wrap').appendChild(strip);
+  }
+
+  const bd = BD[center];
+  const node = N[center];
+  if(!bd && !node?.note) { strip.innerHTML=''; strip.style.opacity='0'; return; }
+
+  let html = '';
+  if(bd) {
+    const lCol = bd.lr==='semantic' ? 'var(--sem)' : bd.lr==='both' ? 'var(--phrase)' : 'var(--phon)';
+    const rCol = bd.rr==='semantic' ? 'var(--sem)' : bd.rr==='both' ? 'var(--phrase)' : 'var(--phon)';
+    html = `
+      <div class="is-note">${bd.note}</div>
+      <div class="is-parts">
+        <span class="is-part" style="color:${lCol}" onclick="navToId('${bd.lid||''}')">${bd.l}
+          <span class="is-role">${bd.lr}</span>${bd.lid?'<span class="is-nav">→</span>':''}
+        </span>
+        <span class="is-plus">+</span>
+        <span class="is-part" style="color:${rCol}" onclick="navToId('${bd.rid||''}')">${bd.r}
+          <span class="is-role">${bd.rr}</span>${bd.rid?'<span class="is-nav">→</span>':''}
+        </span>
+      </div>`;
+  } else if(node?.note) {
+    html = `<div class="is-note">${node.note}</div>`;
+  }
+
+  strip.innerHTML = html;
+  strip.style.opacity = '1';
+}
+
+function renderRootPicker() {
+  document.getElementById('root-picker').innerHTML = ROOTS.map(id =>
+    `<span class="rp${id===center?' active':''}" onclick="jumpTo('${id}')">${N[id]?.char||''}</span>`
+  ).join('');
+}
+
+// ── BREAK ANIMATION ───────────────────────────────────────────────────────
+function triggerBreak() {
+  const bd = BD[center];
+  if(!bd) return;
+  const wrap = document.getElementById('graph-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const cx = W/2, cy = H * 0.38;
+
+  const overlay = document.getElementById('split-overlay');
+  overlay.classList.add('active');
+
+  // Ghost of center character in the background
+  const ghost = document.getElementById('split-ghost');
+  ghost.textContent = N[center]?.char || '';
+  ghost.style.left = cx + 'px';
+  ghost.style.top  = cy + 'px';
+  ghost.style.opacity = '1';
+
+  // Position UNBREAK button exactly where BREAK button was
+  const dismissBtn = overlay.querySelector('.split-dismiss');
+  dismissBtn.style.left = cx + 'px';
+  dismissBtn.style.top  = (cy - clamp(80, 14, 120)) + 'px';
+
+  const lCol = bd.lr==='semantic' ? 'var(--sem)' : bd.lr==='both' ? 'var(--phrase)' : 'var(--phon)';
+  const rCol = bd.rr==='semantic' ? 'var(--sem)' : bd.rr==='both' ? 'var(--phrase)' : 'var(--phon)';
+
+  const lNode = bd.lid ? N[bd.lid] : null;
+  const rNode = bd.rid ? N[bd.rid] : null;
+
+  const leftEl  = document.getElementById('split-left');
+  const rightEl = document.getElementById('split-right');
+
+  leftEl.innerHTML = `
+    <div class="split-char" style="color:${lCol}">${bd.l}</div>
+    <div class="split-py" style="color:${lCol}">${lNode?.py || ''}</div>
+    <div class="split-en">${bd.len}</div>
+    <div style="font-size:.5rem;color:${lCol};margin-top:5px;opacity:.7;">TAP TO EXPLORE →</div>`;
+
+  rightEl.innerHTML = `
+    <div class="split-char" style="color:${rCol}">${bd.r}</div>
+    <div class="split-py" style="color:${rCol}">${rNode?.py || ''}</div>
+    <div class="split-en">${bd.ren}</div>
+    <div style="font-size:.5rem;color:${rCol};margin-top:5px;opacity:.7;">${bd.rid ? 'TAP TO EXPLORE →' : 'phonetic hint'}</div>`;
+
+  leftEl.style.cursor  = 'pointer';
+  rightEl.style.cursor = bd.rid ? 'pointer' : 'default';
+
+  // Both parts start at center, animate outward
+  leftEl.style.transition  = 'none';
+  rightEl.style.transition = 'none';
+  leftEl.style.left  = cx + 'px'; leftEl.style.top  = cy + 'px'; leftEl.style.opacity = '0';
+  rightEl.style.left = cx + 'px'; rightEl.style.top = cy + 'px'; rightEl.style.opacity = '0';
+
+  const gap = Math.min(W * 0.26, 170);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    leftEl.style.transition  = 'left .55s cubic-bezier(.34,1.4,.64,1), top .55s, opacity .35s';
+    rightEl.style.transition = 'left .55s cubic-bezier(.34,1.4,.64,1), top .55s, opacity .35s';
+    leftEl.style.left   = (cx - gap) + 'px'; leftEl.style.top  = cy + 'px'; leftEl.style.opacity = '1';
+    rightEl.style.left  = (cx + gap) + 'px'; rightEl.style.top = cy + 'px'; rightEl.style.opacity = '1';
+  }));
+}
+
+function closeSplit() {
+  const leftEl  = document.getElementById('split-left');
+  const rightEl = document.getElementById('split-right');
+  const wrap = document.getElementById('graph-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const cx = W/2, cy = H * 0.38;
+
+  // Animate parts back to center before hiding
+  leftEl.style.transition  = 'left .4s cubic-bezier(.64,0,.34,1), opacity .3s .15s';
+  rightEl.style.transition = 'left .4s cubic-bezier(.64,0,.34,1), opacity .3s .15s';
+  leftEl.style.left  = cx + 'px'; leftEl.style.opacity  = '0';
+  rightEl.style.left = cx + 'px'; rightEl.style.opacity = '0';
+
+  const ghost = document.getElementById('split-ghost');
+  ghost.style.opacity = '0';
+
+  setTimeout(() => {
+    const overlay = document.getElementById('split-overlay');
+    overlay.classList.remove('active');
+    // Restore graph
+    document.getElementById('graph-svg').style.opacity = '';
+    wrap.querySelectorAll('.cn,.on').forEach(el => el.style.opacity = '');
+    const strip = document.getElementById('info-strip');
+    if(strip) strip.style.opacity = '1';
+  }, 380);
+}
+
+function splitNav(side) {
+  const bd = BD[center];
+  if(!bd) return;
+  const id = side === 'left' ? bd.lid : bd.rid;
+  if(id && N[id]) {
+    closeSplit();
+    navToId(id);
+  } else if(side === 'right') {
+    // Phonetic component has no graph node — nothing to navigate to
+    // Show a brief visual cue
+    const el = document.getElementById('split-right');
+    el.style.opacity = '0.5';
+    setTimeout(() => { el.style.opacity = '1'; }, 400);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────
+function navToId(id) {
+  if(!id || !N[id] || id===center) return;
+  history.push(center); center = id; render();
+}
+
+function navBack() {
+  if(!history.length) return;
+  center = history.pop(); render();
+}
+
+function jumpTo(nodeId) {
+  if(nodeId===center) return;
+  history=[]; center=nodeId; render();
+}
+
+// ── LEGEND TOGGLES ────────────────────────────────────────────────────────
+document.querySelectorAll('.leg').forEach(el => {
+  el.addEventListener('click', () => {
+    const nb = el.dataset.nb;
+    if(vis.has(nb)) { if(vis.size>1){vis.delete(nb);el.classList.remove('on');} }
+    else { vis.add(nb); el.classList.add('on'); }
+    render();
+  });
+});
+
+window.addEventListener('resize', () => render());
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
