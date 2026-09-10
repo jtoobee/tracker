@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>漢字 Flashcards</title>
+<style>
+:root{
+  --ink:#1a1a1a;--paper:#f7f5f0;--card:#fff;
+  --red:#b03a2e;--red-p:#fef5f4;
+  --gold:#7d5a00;
+  --mist:#e5e1d8;--mid:#555;
+  --pass:#1a6b38;--fail:#b03a2e;
+  --neutral:#666;--sh:rgba(0,0,0,.07);
+  --bubble:#f0f4ff;--bubble-b:#c5d0f0;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+     background:var(--paper);color:var(--ink);display:flex;flex-direction:column}
+
+/* HEADER */
+header{background:var(--ink);color:#fff;padding:10px 14px;
+       display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+header h1{font-size:.92rem;font-weight:500;letter-spacing:.03em}
+header span{font-size:.65rem;color:#999;font-family:monospace}
+
+/* CONTROLS */
+.ctrl{background:var(--mist);border-bottom:1px solid #ccc8bf;
+      padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px;
+      align-items:flex-end;flex-shrink:0}
+.cg{display:flex;flex-direction:column;gap:2px}
+.cg label{font-size:.6rem;color:var(--neutral);text-transform:uppercase;
+           letter-spacing:.07em;font-family:monospace}
+.cg input,.cg select{font-size:.85rem;padding:4px 6px;border:1px solid #bfbab1;
+                      background:#fff;border-radius:4px;
+                      -webkit-appearance:none;appearance:none}
+.cg input{width:68px}.cg select{width:112px}
+
+/* pinyin toggle */
+.py-toggle{display:flex;align-items:center;gap:6px;align-self:flex-end;
+            padding-bottom:2px;cursor:pointer;user-select:none}
+.py-toggle label{font-size:.72rem;color:var(--mid);cursor:pointer;font-family:monospace}
+.toggle-track{width:36px;height:20px;background:#bbb;border-radius:10px;
+               position:relative;transition:background .2s;cursor:pointer;flex-shrink:0}
+.toggle-track.on{background:var(--pass)}
+.toggle-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;
+              background:#fff;border-radius:50%;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle-track.on .toggle-knob{left:18px}
+
+.btn-go{background:var(--ink);color:#fff;border:none;padding:6px 13px;
+         font-size:.85rem;cursor:pointer;border-radius:4px;align-self:flex-end;min-height:32px}
+
+/* PROGRESS */
+.prog{height:3px;background:var(--mist);flex-shrink:0}
+.prog-bar{height:100%;background:var(--red);transition:width .3s;width:0}
+
+/* STATS */
+.stats{display:flex;background:#fff;border-bottom:1px solid var(--mist);flex-shrink:0}
+.stat{flex:1;padding:6px 4px;text-align:center;border-right:1px solid var(--mist)}
+.stat:last-child{border-right:none}
+.sn{font-size:1.2rem;font-weight:700;display:block;line-height:1}
+.sl{font-size:.56rem;color:var(--neutral);font-family:monospace;text-transform:uppercase;
+     margin-top:1px;display:block}
+.stat.pass .sn{color:var(--pass)}.stat.fail .sn{color:var(--fail)}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:10px 12px;overflow:hidden;min-height:0}
+
+/* STUDY ROW */
+.study-row{display:flex;gap:10px;width:100%;max-width:660px;
+            align-items:flex-start;justify-content:center}
+
+/* CARD */
+.card-wrap{flex-shrink:0;width:min(310px,calc(100vw - 24px));
+            user-select:none;-webkit-user-select:none;perspective:1000px}
+.card-inner{position:relative;width:100%;min-height:270px;
+            transition:transform .4s cubic-bezier(.4,0,.2,1);
+            transform-style:preserve-3d}
+.card-inner.flipped{transform:rotateY(180deg)}
+.face{position:absolute;width:100%;min-height:270px;backface-visibility:hidden;
+      -webkit-backface-visibility:hidden;background:#fff;border-radius:10px;
+      box-shadow:0 2px 14px var(--sh),0 0 0 1px var(--mist);
+      display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:20px 16px}
+.face.back{transform:rotateY(180deg);justify-content:center}
+
+/* front face */
+.cnum{position:absolute;top:10px;left:12px;font-size:.63rem;color:#bbb;font-family:monospace}
+.ccopy{position:absolute;top:9px;right:10px;font-size:.68rem;color:#bbb;
+        cursor:copy;background:#f4f4f4;border-radius:3px;padding:1px 5px;
+        font-family:monospace;user-select:all;-webkit-user-select:all;border:1px solid #e0e0e0}
+.ccopy:hover{background:#e8e8e8;color:#555}
+/* speak button on front */
+.speak-front{position:absolute;bottom:10px;right:12px;
+              font-size:1.1rem;cursor:pointer;opacity:.45;line-height:1;
+              background:none;border:none;color:var(--ink)}
+.speak-front:hover{opacity:.8}
+.hanzi{font-size:4.6rem;line-height:1;color:var(--ink);cursor:pointer}
+.front-hint{position:absolute;bottom:10px;left:12px;font-size:.6rem;color:#bbb;font-family:monospace}
+
+/* back face */
+.back-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.bcopy{font-size:.68rem;color:#bbb;font-family:monospace;
+        user-select:all;-webkit-user-select:all;cursor:copy;
+        background:#f4f4f4;border-radius:3px;padding:1px 6px;border:1px solid #e0e0e0}
+.bchar{font-size:2.6rem;line-height:1}
+.speak-back{font-size:1.15rem;cursor:pointer;opacity:.45;background:none;border:none;color:var(--ink)}
+.speak-back:hover{opacity:.8}
+.bkw{font-size:1rem;font-weight:700;text-align:center;margin-bottom:2px}
+.divider{width:28px;height:1px;background:var(--mist);margin:4px auto 6px}
+/* pinyin — hidden when toggle off */
+.bpy{font-size:.95rem;color:var(--red);text-align:center;font-family:monospace;margin-bottom:4px}
+.bnote{font-size:.72rem;color:var(--gold);text-align:center;font-style:italic;
+        padding:0 6px;line-height:1.5}
+/* flip-back hint */
+.flip-back-hint{position:absolute;bottom:9px;font-size:.6rem;color:#bbb;font-family:monospace}
+
+/* WORD BUBBLES */
+.bubbles{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;max-width:190px}
+.bubbles-label{font-size:.6rem;color:#bbb;font-family:monospace;text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:1px}
+.bubble{background:var(--bubble);border:1px solid var(--bubble-b);border-radius:8px;
+         padding:6px 9px;cursor:pointer;transition:background .15s;position:relative;min-height:44px}
+.bubble:hover{background:#dce7ff}
+.bubble.flipped-b{background:#fff8e0;border-color:#d8c060}
+.bw-word{font-size:1.05rem;display:block;line-height:1.2}
+/* bubble pinyin — toggled */
+.bw-py{font-size:.7rem;color:var(--mid);font-family:monospace;display:block;margin-top:1px}
+.bw-def{font-size:.78rem;color:var(--pass);display:none;margin-top:4px;font-style:italic;line-height:1.3}
+.bubble.flipped-b .bw-def{display:block}
+.bw-speak{position:absolute;top:5px;right:7px;font-size:.85rem;cursor:pointer;
+           background:none;border:none;opacity:.4}
+.bw-speak:hover{opacity:.85}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:8px;margin-top:10px;width:min(310px,calc(100vw - 24px))}
+.btn-flip,.btn-pass,.btn-fail,.btn-unflip{flex:1;padding:12px;border:none;border-radius:6px;
+  font-size:.92rem;cursor:pointer;transition:opacity .15s,transform .1s;font-weight:500}
+.btn-flip:active,.btn-pass:active,.btn-fail:active,.btn-unflip:active{transform:scale(.97)}
+.btn-flip{background:var(--ink);color:#fff}
+.btn-unflip{background:#888;color:#fff;flex:0.6}
+.btn-pass{background:var(--pass);color:#fff}
+.btn-fail{background:var(--fail);color:#fff}
+.kb{font-size:.6rem;color:#bbb;font-family:monospace;margin-top:5px;text-align:center}
+
+/* RESULTS */
+.results{text-align:center;padding:24px 14px;max-width:320px;margin:0 auto}
+.results h2{font-size:1.4rem;margin-bottom:5px}
+.results p{color:var(--neutral);margin-bottom:16px;font-size:.86rem;line-height:1.6}
+.rg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.rb{padding:12px;border-radius:6px;text-align:center}
+.rb.rp{background:#e6f4ee}.rb.rf{background:var(--red-p)}
+.rn{font-size:1.8rem;font-weight:700;display:block}
+.rb.rp .rn{color:var(--pass)}.rb.rf .rn{color:var(--fail)}
+.rl{font-size:.66rem;color:var(--neutral);font-family:monospace}
+.btn-r,.btn-rf{border:none;padding:9px 16px;font-size:.86rem;cursor:pointer;
+                border-radius:4px;margin:3px;font-weight:500}
+.btn-r{background:var(--ink);color:#fff}
+.btn-rf{background:var(--fail);color:#fff;display:none}
+
+/* SETUP */
+.setup{flex:1;display:flex;flex-direction:column;align-items:center;
+       justify-content:center;padding:24px 16px;text-align:center}
+.setup h2{font-size:1.25rem;margin-bottom:7px}
+.setup p{color:var(--neutral);line-height:1.7;font-size:.86rem;max-width:270px}
+
+.hidden{display:none!important}
+
+/* toast */
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+        background:#333;color:#fff;padding:6px 14px;border-radius:18px;
+        font-size:.8rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+
+/* pinyin hidden state */
+body.hide-py .bpy{display:none}
+body.hide-py .bw-py{display:none}
+
+@media(min-width:520px){
+  .card-inner,.face{min-height:290px}
+  .hanzi{font-size:5rem}
+}
+@media(max-width:499px){
+  .bubbles{display:none!important}
+  .card-wrap{width:calc(100vw - 24px)}
+}
+</style>
+</head>
+<body class="hide-py">
+
+<header>
+  <h1>漢字 Flashcards</h1>
+  <span>RSH Book 1 · 1500 chars</span>
+</header>
+
+<div class="ctrl">
+  <div class="cg"><label>From #</label><input type="number" id="iFrom" value="1" min="1" max="1500"></div>
+  <div class="cg"><label>To #</label><input type="number" id="iTo" value="50" min="1" max="1500"></div>
+  <div class="cg"><label>Order</label>
+    <select id="iOrder"><option value="seq">In order</option><option value="rand">Shuffled</option></select></div>
+  <div class="cg"><label>Front</label>
+    <select id="iFront"><option value="char">Character</option><option value="kw">Keyword</option></select></div>
+
+  <!-- Pinyin toggle -->
+  <div class="py-toggle" onclick="togglePinyin()">
+    <div class="toggle-track" id="pyTrack"><div class="toggle-knob"></div></div>
+    <label>Pinyin</label>
+  </div>
+
+  <button class="btn-go" onclick="startSession()">Study →</button>
+</div>
+
+<div class="prog"><div class="prog-bar" id="progBar"></div></div>
+
+<div class="stats hidden" id="statsRow">
+  <div class="stat"><span class="sn" id="sIdx">0</span><span class="sl">Card</span></div>
+  <div class="stat"><span class="sn" id="sTotal">0</span><span class="sl">Total</span></div>
+  <div class="stat pass"><span class="sn" id="sPass">0</span><span class="sl">✓ Know</span></div>
+  <div class="stat fail"><span class="sn" id="sFail">0</span><span class="sl">✗ Again</span></div>
+</div>
+
+<div class="setup" id="setupScreen">
+  <h2>漢字 Flashcards</h2>
+  <p>All 1500 characters from <em>Remembering Simplified Hanzi</em> Book 1 in your exact book order.<br><br>
+  🔊 Tap the speaker to hear pronunciation.<br>
+  Tap word bubbles to reveal meaning.<br>
+  Pinyin toggle off by default — turn on when needed.<br>
+  Tap a flipped card to flip back.</p>
+</div>
+
+<div class="main hidden" id="studyArea">
+  <div class="study-row">
+
+    <!-- CARD -->
+    <div class="card-wrap" id="cardWrap">
+      <div class="card-inner" id="cardInner">
+
+        <!-- FRONT -->
+        <div class="face front" onclick="flipCard()">
+          <span class="cnum" id="cNum">#1</span>
+          <span class="ccopy" id="fCopy" title="copy character" onclick="copyChar(event,'fCopy')">一</span>
+          <div class="hanzi" id="frontMain">一</div>
+          <span class="front-hint">tap to reveal</span>
+          <button class="speak-front" onclick="speakCurrent(event)" title="hear pronunciation">🔊</button>
+        </div>
+
+        <!-- BACK -->
+        <div class="face back" onclick="unflipCard()">
+          <div class="back-top">
+            <span class="bcopy" id="bCopy" title="copy" onclick="copyChar(event,'bCopy')">一</span>
+            <span class="bchar" id="bChar">一</span>
+            <button class="speak-back" onclick="speakCurrent(event)" title="hear pronunciation">🔊</button>
+          </div>
+          <div class="bkw" id="bKw">one</div>
+          <div class="divider"></div>
+          <div class="bpy" id="bPy">yī</div>
+          <div class="bnote" id="bNote"></div>
+          <span class="flip-back-hint">tap card to flip back</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- WORD BUBBLES -->
+    <div class="bubbles hidden" id="bubblesCol">
+      <div class="bubbles-label">Common words</div>
+    </div>
+
+  </div>
+
+  <!-- button rows -->
+  <div class="btn-row" id="rowFlip">
+    <button class="btn-flip" onclick="flipCard()">Reveal</button>
+  </div>
+  <div class="btn-row hidden" id="rowJudge">
+    <button class="btn-fail" onclick="judge(false)">✗  Again</button>
+    <button class="btn-unflip" onclick="unflipCard()">↩ Back</button>
+    <button class="btn-pass" onclick="judge(true)">✓  Know it</button>
+  </div>
+  <div class="kb">Space=reveal · ↩=flip back · ←Again · →Know it · tap 🔊 to hear</div>
+</div>
+
+<div class="main hidden" id="resultsArea">
+  <div class="results">
+    <h2>Session done!</h2>
+    <p id="resSub"></p>
+    <div class="rg">
+      <div class="rb rp"><span class="rn" id="rPass">0</span><span class="rl">Know it</span></div>
+      <div class="rb rf"><span class="rn" id="rFail">0</span><span class="rl">Review again</span></div>
+    </div>
+    <button class="btn-r" onclick="startSession()">Same range again</button>
+    <button class="btn-rf" id="btnFailed" onclick="reviewFailed()">Review missed only</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CARDS=[
+[1,"一","one","yī","→衣(yī)",[["一下","yī xià","once/a bit"],["一起","yī qǐ","together"],["一样","yī yàng","same"]]],
+[2,"二","two","èr","",[["第二","dì èr","second"],["二月","èr yuè","February"]]],
+[3,"三","three","sān","→参(sān)",[["三月","sān yuè","March"],["三角","sān jiǎo","triangle"]]],
+[4,"四","four","sì","→泗(sì)驷(sì)",[["四月","sì yuè","April"],["四方","sì fāng","all directions"]]],
+[5,"五","five","wǔ","→吾(wú)悟(wù)误(wù)梧(wú)",[["五月","wǔ yuè","May"],["五官","wǔ guān","facial features"]]],
+[6,"六","six","liù","→溜(liū)",[["六月","liù yuè","June"],["六十","liù shí","sixty"]]],
+[7,"七","seven","qī","→切(qiē)",[["七月","qī yuè","July"],["七十","qī shí","seventy"]]],
+[8,"八","eight","bā","→叭(bā)扒(bā)",[["八月","bā yuè","August"],["八十","bā shí","eighty"]]],
+[9,"九","nine","jiǔ","→久(jiǔ)究(jiū)纠(jiū)",[["九月","jiǔ yuè","September"],["九十","jiǔ shí","ninety"]]],
+[10,"十","ten","shí","→什(shén)汁(zhī)针(zhēn)",[["十月","shí yuè","October"],["十分","shí fēn","very/completely"]]],
+[11,"口","mouth","kǒu","Semantic radical: speech/mouth",[["口语","kǒu yǔ","spoken language"],["出口","chū kǒu","exit/export"],["口味","kǒu wèi","taste preference"]]],
+[12,"日","sun/day","rì","→旦(dàn)但(dàn)担(dān)",[["日本","rì běn","Japan"],["日子","rì zi","day/life"],["每日","měi rì","every day"]]],
+[13,"月","moon/month","yuè","→朋(péng)明(míng)",[["月亮","yuè liàng","moon"],["月份","yuè fèn","month"],["上月","shàng yuè","last month"]]],
+[14,"田","rice field","tián","→甸(diàn)佃(diàn)",[["田地","tián dì","farmland"],["田野","tián yě","fields"]]],
+[15,"目","eye","mù","Semantic radical: vision/seeing",[["目标","mù biāo","goal/target"],["目前","mù qián","currently"],["节目","jié mù","program"]]],
+[16,"古","antiquity","gǔ","→故(gù)固(gù)苦(kǔ)枯(kū)",[["古代","gǔ dài","ancient times"],["古老","gǔ lǎo","ancient"],["古典","gǔ diǎn","classical"]]],
+[17,"胡","reckless","hú","→湖(hú)糊(hú)",[["胡说","hú shuō","nonsense"],["胡须","hú xū","beard"]]],
+[18,"叶","leaf","yè","→世(shì)",[["叶子","yè zi","leaf"],["茶叶","chá yè","tea leaves"],["树叶","shù yè","tree leaf"]]],
+[19,"吾","I (classical)","wú","→悟(wù)误(wù) — 五 hints sound",[["吾辈","wú bèi","people like us (classical)"]]],
+[20,"朋","friend","péng","→棚(péng)硼(péng)",[["朋友","péng yǒu","friend"],["好朋友","hǎo péng yǒu","good friend"]]],
+[21,"明","bright","míng","→盟(méng) — 明天(tomorrow)",[["明天","míng tiān","tomorrow"],["明白","míng bái","understand"],["明显","míng xiǎn","obvious"]]],
+[22,"唱","sing","chàng","→昌(chāng) hints sound — 唱歌(sing)",[["唱歌","chàng gē","sing a song"],["演唱","yǎn chàng","perform/sing"]]],
+[23,"晶","sparkling","jīng","→精(jīng) — 水晶(crystal)",[["水晶","shuǐ jīng","crystal/quartz"],["结晶","jié jīng","crystallize"]]],
+[24,"品","goods/quality","pǐn","",[["品质","pǐn zhì","quality"],["产品","chǎn pǐn","product"],["食品","shí pǐn","food product"]]],
+[25,"昌","prosperous","chāng","→唱(chàng)猖(chāng)娼(chāng)",[["昌盛","chāng shèng","flourishing"],["繁昌","fán chāng","prosperous"]]],
+[26,"早","early","zǎo","→草(cǎo)皂(zào) — 早上(morning)",[["早上","zǎo shàng","morning"],["早饭","zǎo fàn","breakfast"],["早点","zǎo diǎn","early/breakfast snack"]]],
+[27,"旭","rising sun","xù","",[["旭日","xù rì","rising sun"]]],
+[28,"世","generation","shì","→叶(yè) — 世界(world)",[["世界","shì jiè","world"],["世纪","shì jì","century"],["世上","shì shàng","in this world"]]],
+[29,"胃","stomach","wèi","→谓(wèi)喂(wèi)",[["胃口","wèi kǒu","appetite"],["胃痛","wèi tòng","stomachache"]]],
+[30,"旦","daybreak","dàn","→但(dàn)担(dān)胆(dǎn) — 元旦(New Year)",[["元旦","yuán dàn","New Year's Day"],["旦夕","dàn xī","very short time"]]],
+[31,"凹","concave","āo","",[["凹凸","āo tū","bumpy/uneven"]]],
+[32,"凸","convex","tū","",[["凸出","tū chū","protrude/stand out"]]],
+[33,"自","self/from","zì","→息(xī)鼻(bí) — 自己(self)",[["自己","zì jǐ","oneself"],["自由","zì yóu","freedom"],["自然","zì rán","nature/natural"]]],
+[34,"白","white","bái","→伯(bó)帛(bó)柏(bǎi)泊(bó)",[["白色","bái sè","white"],["白天","bái tiān","daytime"],["明白","míng bái","understand"]]],
+[35,"百","hundred","bǎi","→陌(mò) — 百分之(percent)",[["百分之","bǎi fēn zhī","percent"],["百货","bǎi huò","department store"],["几百","jǐ bǎi","hundreds"]]],
+[36,"皂","soap","zào","→澡(zǎo)",[["肥皂","féi zào","soap"],["皂白","zào bái","right and wrong"]]],
+[37,"旧","old/used","jiù","— 旧的(old/used)",[["旧书","jiù shū","used book"],["新旧","xīn jiù","new and old"]]],
+[38,"中","middle","zhōng","→种(zhǒng)钟(zhōng) — 中国(China)",[["中国","zhōng guó","China"],["中间","zhōng jiān","middle/between"],["中文","zhōng wén","Chinese"]]],
+[39,"千","thousand","qiān","→迁(qiān)仟(qiān)",[["千万","qiān wàn","ten million/by all means"],["几千","jǐ qiān","thousands"]]],
+[40,"舌","tongue","shé","→话(huà)括(kuò)活(huó)",[["舌头","shé tou","tongue"],["舌尖","shé jiān","tip of tongue"]]],
+[41,"升","rise/liter","shēng","→昇(shēng)",[["上升","shàng shēng","rise/ascend"],["升级","shēng jí","upgrade"]]],
+[42,"丸","pill","wán","→执(zhí)",[["药丸","yào wán","pill/tablet"],["丸子","wán zi","meatball"]]],
+[43,"卜","fortune-telling","bǔ","Semantic primitive: divination",[["占卜","zhān bǔ","divination"]]],
+[44,"占","divine/occupy","zhān/zhàn","→点(diǎn)店(diàn)站(zhàn)",[["占领","zhàn lǐng","occupy/seize"],["占据","zhàn jù","occupy"],["占线","zhàn xiàn","line busy"]]],
+[45,"上","above/up","shàng","— 上面(above)",[["上面","shàng miàn","above/on top"],["上课","shàng kè","attend class"],["上班","shàng bān","go to work"]]],
+[46,"下","below/down","xià","— 下面(below)",[["下面","xià miàn","below/under"],["下午","xià wǔ","afternoon"],["下来","xià lái","come down"]]],
+[47,"卡","stuck/card","qiǎ/kǎ","— 卡片(card)",[["卡片","kǎ piàn","card"],["信用卡","xìn yòng kǎ","credit card"],["卡住","qiǎ zhù","get stuck"]]],
+[48,"卓","outstanding","zhuó","→桌(zhuō)",[["卓越","zhuó yuè","outstanding"],["卓著","zhuó zhù","distinguished"]]],
+[49,"朝","dynasty/morning","zhāo/cháo","→嘲(cháo)潮(cháo) — 嘲笑(mock)",[["朝鲜","cháo xiǎn","Korea"],["朝代","cháo dài","dynasty"],["朝向","cháo xiàng","face toward"]]],
+[50,"嘲","mock","cháo","朝 hints sound — 嘲笑(ridicule)",[["嘲笑","cháo xiào","mock/ridicule"],["嘲弄","cháo nòng","tease/mock"]]],
+[51,"只","only","zhǐ/zhī","— 只有(only have)",[["只有","zhǐ yǒu","only if"],["只是","zhǐ shì","just/merely"],["只要","zhǐ yào","as long as"]]],
+[52,"贝","shell/money","bèi","Semantic radical: value/money",[["贝壳","bèi ké","shell"],["贝类","bèi lèi","shellfish"]]],
+[53,"贴","paste/stick","tiē","→帖(tiē)",[["贴近","tiē jìn","close to"],["张贴","zhāng tiē","post/stick up"],["贴心","tiē xīn","considerate"]]],
+[54,"贞","chaste","zhēn","→侦(zhēn)",[["坚贞","jiān zhēn","steadfast/loyal"]]],
+[55,"员","member","yuán","→圆(yuán)损(sǔn)",[["员工","yuán gōng","employee"],["成员","chéng yuán","member"],["演员","yǎn yuán","actor"]]],
+[56,"儿","child","ér","→光(guāng)",[["儿子","ér zi","son"],["儿童","ér tóng","children"],["儿女","ér nǚ","children"]]],
+[57,"几","how many","jǐ/jī","→机(jī)饥(jī)",[["几个","jǐ gè","several"],["几乎","jī hū","almost"],["多少","duō shao","how many"]]],
+[58,"见","see/meet","jiàn","→现(xiàn)觉(jué) — 再见(goodbye)",[["再见","zài jiàn","goodbye"],["见面","jiàn miàn","meet someone"],["意见","yì jiàn","opinion"]]],
+[59,"元","origin/dollar","yuán","→园(yuán)远(yuǎn)完(wán)顽(wán)",[["元旦","yuán dàn","New Year's Day"],["元素","yuán sù","element"],["元宵","yuán xiāo","Lantern Festival"]]],
+[60,"页","page/head","yè","Semantic radical: head",[["网页","wǎng yè","webpage"],["页面","yè miàn","page/interface"],["首页","shǒu yè","homepage"]]],
+[61,"顽","stubborn","wán","→完(wán) — 顽固(stubborn)顽皮(naughty)",[["顽固","wán gù","stubborn"],["顽皮","wán pí","naughty"],["顽强","wán qiáng","tenacious"]]],
+[62,"凡","ordinary","fán","→帆(fān)范(fàn)",[["凡是","fán shì","all/every"],["平凡","píng fán","ordinary"],["非凡","fēi fán","extraordinary"]]],
+[63,"肌","muscle","jī","→机(jī)",[["肌肉","jī ròu","muscle"],["肌肤","jī fū","skin"]]],
+[64,"负","bear/negative","fù","→败(bài)",[["负责","fù zé","be responsible"],["负担","fù dān","burden"],["胜负","shèng fù","win or lose"]]],
+[65,"万","ten thousand","wàn","— 万一(just in case)",[["万一","wàn yī","just in case"],["万分","wàn fēn","extremely"],["千万","qiān wàn","by all means"]]],
+[66,"匀","even","yún","→韵(yùn)均(jūn)",[["均匀","jūn yún","even/uniform"],["匀称","yún chèn","well-proportioned"]]],
+[67,"句","sentence","jù","→够(gòu)构(gòu)狗(gǒu)",[["句子","jù zi","sentence"],["一句话","yī jù huà","a sentence"]]],
+[68,"旬","ten-day period","xún","",[["上旬","shàng xún","first 10 days of month"],["下旬","xià xún","last 10 days"]]],
+[69,"勺","spoon","sháo","→约(yuē)钓(diào)",[["勺子","sháo zi","spoon/ladle"],["汤勺","tāng sháo","soup ladle"]]],
+[70,"的","possessive marker","de","Most common character in Chinese",[["我的","wǒ de","my/mine"],["目的","mù dì","purpose/goal"]]],
+[71,"首","head/first","shǒu","→道(dào)",[["首先","shǒu xiān","first of all"],["首都","shǒu dū","capital city"],["首席","shǒu xí","chief"]]],
+[72,"直","straight","zhí","→值(zhí)植(zhí)",[["直接","zhí jiē","direct/directly"],["一直","yī zhí","always/straight"],["直到","zhí dào","until"]]],
+[73,"置","place/set up","zhì","",[["放置","fàng zhì","place/put"],["设置","shè zhì","set up/configure"]]],
+[74,"具","tool/possess","jù","→俱(jù)",[["工具","gōng jù","tool"],["具体","jù tǐ","specific"],["具有","jù yǒu","possess/have"]]],
+[75,"真","real/true","zhēn","→填(tián)慎(shèn) — 真的(really)",[["真的","zhēn de","really/true"],["真正","zhēn zhèng","genuine"],["认真","rèn zhēn","serious/careful"]]],
+[76,"工","work","gōng","→功(gōng)空(kōng)江(jiāng)攻(gōng)",[["工作","gōng zuò","work/job"],["工人","gōng rén","worker"],["工资","gōng zī","salary"]]],
+[77,"左","left","zuǒ","→佐(zuǒ)",[["左边","zuǒ biān","left side"],["左右","zuǒ yòu","approximately"]]],
+[78,"右","right","yòu","→有(yǒu)",[["右边","yòu biān","right side"],["左右","zuǒ yòu","approximately"]]],
+[79,"有","have/exist","yǒu","→右(yòu) — 有的(some)",[["有的","yǒu de","some"],["有意思","yǒu yì si","interesting"],["没有","méi yǒu","not have"]]],
+[80,"贿","bribe","huì","→悔(huǐ)",[["贿赂","huì lù","bribery"]]],
+[81,"贡","tribute","gòng","工 hints sound",[["贡献","gòng xiàn","contribution"]]],
+[82,"项","item/neck","xiàng","→页(yè) component",[["项目","xiàng mù","project/item"],["事项","shì xiàng","matter/item"]]],
+[83,"刀","knife","dāo","Semantic radical: cutting",[["刀子","dāo zi","knife"],["刀片","dāo piàn","blade"]]],
+[84,"刃","blade","rèn","→忍(rěn)",[["刀刃","dāo rèn","blade edge"]]],
+[85,"切","cut/all","qiē/qiè","七 hints sound",[["切菜","qiē cài","cut vegetables"],["一切","yī qiè","everything"],["亲切","qīn qiè","warm/friendly"]]],
+[86,"召","summon","zhào","→昭(zhāo)照(zhào)招(zhāo)",[["召开","zhào kāi","convene a meeting"],["召唤","zhào huàn","summon"]]],
+[87,"昭","bright/manifest","zhāo","→召(zhào) hints sound",[["昭示","zhāo shì","show clearly"]]],
+[88,"则","rule/then","zé","→测(cè)侧(cè)",[["规则","guī zé","rule/regulation"],["原则","yuán zé","principle"],["否则","fǒu zé","otherwise"]]],
+[89,"副","deputy/pair","fù","→福(fú)",[["副总统","fù zǒng tǒng","vice president"],["一副","yī fù","a pair/set of"],["副作用","fù zuò yòng","side effect"]]],
+[90,"丁","nail/fourth","dīng","→打(dǎ)顶(dǐng)叮(dīng)灯(dēng)",[["园丁","yuán dīng","gardener"]]],
+[91,"叮","sting/urge","dīng","丁 hints sound",[["叮嘱","dīng zhǔ","urge/remind repeatedly"]]],
+[92,"可","can/may","kě","→何(hé)河(hé)歌(gē)哥(gē) — 可以(can)",[["可以","kě yǐ","can/may"],["可能","kě néng","possible"],["可是","kě shì","but/however"]]],
+[93,"哥","elder brother","gē","可 hints sound",[["哥哥","gē ge","elder brother"],["大哥","dà gē","eldest brother"]]],
+[94,"顶","top/very","dǐng","丁 hints sound — 顶上(top)",[["顶上","dǐng shàng","on top"],["山顶","shān dǐng","mountaintop"]]],
+[95,"乙","second","yǐ","→艺(yì)",[["甲乙","jiǎ yǐ","A and B/first and second"]]],
+[96,"飞","fly","fēi","— 飞机(airplane)",[["飞机","fēi jī","airplane"],["飞行","fēi xíng","fly/flight"],["飞快","fēi kuài","very fast"]]],
+[97,"子","child/son","zǐ","→字(zì)仔(zǎi) — 子女(children)",[["子女","zǐ nǚ","children"],["孩子","hái zi","child"],["儿子","ér zi","son"]]],
+[98,"孔","hole/Confucius","kǒng","→恐(kǒng)",[["孔子","kǒng zǐ","Confucius"],["毛孔","máo kǒng","pore"]]],
+[99,"吼","roar","hǒu","",[["吼叫","hǒu jiào","roar/yell"]]],
+[100,"乱","chaos","luàn","",[["混乱","hùn luàn","chaos"],["乱说","luàn shuō","talk nonsense"]]],
+[101,"了","complete/understand","le/liǎo","— 好了(okay)",[["好了","hǎo le","okay/done"],["了解","liǎo jiě","understand"]]],
+[102,"女","female","nǚ","Semantic radical: female — 女人(woman)",[["女人","nǚ rén","woman"],["女孩","nǚ hái","girl"],["女士","nǚ shì","Ms./lady"]]],
+[103,"好","good","hǎo","— 好的(okay)好笑(funny)",[["好的","hǎo de","okay/good"],["好笑","hǎo xiào","funny"],["好吃","hǎo chī","delicious"]]],
+[104,"如","as if/like","rú","→茹(rú)",[["如果","rú guǒ","if"],["如何","rú hé","how/what about"],["比如","bǐ rú","for example"]]],
+[105,"母","mother","mǔ","→每(měi)海(hǎi)悔(huǐ)",[["母亲","mǔ qīn","mother (formal)"],["母语","mǔ yǔ","mother tongue"],["父母","fù mǔ","parents"]]],
+[106,"贯","pierce/string","guàn","→惯(guàn)",[["贯穿","guàn chuān","run through"],["一贯","yī guàn","consistent/always"]]],
+[107,"兄","elder brother","xiōng","→况(kuàng)祝(zhù)",[["兄弟","xiōng dì","brothers"]]],
+[108,"克","overcome/gram","kè","→刻(kè)",[["克服","kè fú","overcome"],["克制","kè zhì","restrain"],["千克","qiān kè","kilogram"]]],
+[109,"小","small","xiǎo","→少(shǎo)省(shěng) — 小的(small)",[["小时","xiǎo shí","hour"],["小心","xiǎo xīn","be careful"],["小说","xiǎo shuō","novel"]]],
+[110,"少","few/young","shǎo/shào","→小(xiǎo)",[["多少","duō shao","how many/much"],["至少","zhì shǎo","at least"],["少数","shǎo shù","minority"]]],
+[111,"吵","noisy/quarrel","chǎo","→炒(chǎo)",[["吵架","chǎo jià","quarrel/fight"],["太吵了","tài chǎo le","too noisy"],["吵闹","chǎo nào","noisy"]]],
+[112,"孙","grandchild","sūn","→逊(xùn)",[["孙子","sūn zi","grandson/Sun Tzu"],["孙女","sūn nǚ","granddaughter"]]],
+[113,"大","big/great","dà","→太(tài)达(dá)天(tiān) — 大的(big)",[["大家","dà jiā","everyone"],["大学","dà xué","university"],["大概","dà gài","probably"]]],
+[114,"尖","sharp/tip","jiān","",[["尖锐","jiān ruì","sharp/acute"],["尖叫","jiān jiào","scream"]]],
+[115,"夕","evening","xī","→外(wài)多(duō)",[["夕阳","xī yáng","setting sun"],["除夕","chú xī","New Year's Eve"]]],
+[116,"多","many/much","duō","— 很多(many)",[["多少","duō shao","how many/much"],["很多","hěn duō","a lot"],["多么","duō me","how/what"]]],
+[117,"够","enough","gòu","句 hints sound",[["够了","gòu le","enough"],["不够","bú gòu","not enough"],["能够","néng gòu","be able to"]]],
+[118,"外","outside","wài","— 外面(outside)",[["外面","wài miàn","outside"],["外国","wài guó","foreign country"],["外语","wài yǔ","foreign language"]]],
+[119,"名","name","míng","→铭(míng) — 名字(name)",[["名字","míng zi","name"],["有名","yǒu míng","famous"],["名牌","míng pái","brand-name"]]],
+[120,"罗","net/collect","luó","",[["罗马","luó mǎ","Rome"]]],
+[121,"厂","factory/cliff","chǎng","Semantic radical: production",[["工厂","gōng chǎng","factory"]]],
+[122,"厅","hall","tīng","→听(tīng)",[["客厅","kè tīng","living room"],["餐厅","cān tīng","restaurant"],["大厅","dà tīng","lobby/hall"]]],
+[123,"厉","strict/sharp","lì","→励(lì)历(lì)",[["厉害","lì hài","fierce/impressive"],["严厉","yán lì","stern/strict"]]],
+[124,"厚","thick","hòu","→候(hòu)",[["厚度","hòu dù","thickness"],["浓厚","nóng hòu","strong/rich"]]],
+[125,"石","stone","shí","→拓(tuò)硕(shuò) — 石头(stone)",[["石头","shí tou","stone/rock"],["石油","shí yóu","petroleum"],["岩石","yán shí","rock"]]],
+[126,"砂","sand","shā","→沙(shā)",[["砂糖","shā táng","granulated sugar"],["砂纸","shā zhǐ","sandpaper"]]],
+[127,"妙","wonderful","miào","→秒(miǎo)",[["奇妙","qí miào","wonderful"],["美妙","měi miào","beautiful/wonderful"]]],
+[128,"肖","resemble","xiào","→消(xiāo)削(xiāo)硝(xiāo)",[["肖像","xiào xiàng","portrait"]]],
+[129,"削","pare/reduce","xiāo/xuē","肖 hints sound",[["削减","xuē jiǎn","cut/reduce"],["削弱","xuē ruò","weaken"],["削铅笔","xiāo qiān bǐ","sharpen pencil"]]],
+[130,"光","light/bare","guāng","→广(guǎng) — 光线(light)",[["光线","guāng xiàn","light/ray"],["阳光","yáng guāng","sunlight"],["光明","guāng míng","bright"]]],
+[131,"太","too/very","tài","→泰(tài) — 太好了(great)",[["太好了","tài hǎo le","great!"],["太阳","tài yáng","sun"],["太太","tài tai","wife/Mrs."]]],
+[132,"省","province/save","shěng/xǐng","",[["省钱","shěng qián","save money"],["省时间","shěng shí jiān","save time"],["省份","shěng fèn","province"]]],
+[133,"奇","strange/odd","qí","→骑(qí)椅(yǐ)寄(jì)",[["奇怪","qí guài","strange/weird"],["好奇","hào qí","curious"],["奇迹","qí jì","miracle"]]],
+[134,"川","river","chuān","→训(xùn)州(zhōu) — 四川(Sichuan)",[["四川","sì chuān","Sichuan"],["山川","shān chuān","mountains and rivers"]]],
+[135,"州","province","zhōu","川 hints sound",[["广州","guǎng zhōu","Guangzhou"],["亚洲","yà zhōu","Asia"]]],
+[136,"顺","smooth/obey","shùn","— 顺利(smoothly)",[["顺利","shùn lì","smooth/successful"],["顺便","shùn biàn","by the way"],["顺序","shùn xù","order/sequence"]]],
+[137,"水","water","shuǐ","Semantic radical: liquid — 水果(fruit)",[["水果","shuǐ guǒ","fruit"],["喝水","hē shuǐ","drink water"],["水平","shuǐ píng","level/standard"]]],
+[138,"永","forever","yǒng","→泳(yǒng)咏(yǒng)",[["永远","yǒng yuǎn","forever"],["永久","yǒng jiǔ","permanent"]]],
+[139,"脉","pulse/vein","mài/mò","",[["脉搏","mài bó","pulse"],["山脉","shān mài","mountain range"]]],
+[140,"求","seek/request","qiú","→球(qiú)救(jiù) — 请求(request)",[["请求","qǐng qiú","request"],["要求","yāo qiú","requirement"],["追求","zhuī qiú","pursue"]]],
+[141,"泉","spring (water)","quán","→原(yuán)源(yuán)",[["泉水","quán shuǐ","spring water"],["温泉","wēn quán","hot spring"]]],
+[142,"原","original/plain","yuán","→源(yuán)愿(yuàn) — 原来(originally)",[["原来","yuán lái","originally/so that's why"],["原因","yuán yīn","reason/cause"],["草原","cǎo yuán","grassland"]]],
+[143,"泳","swim","yǒng","永 hints sound — 游泳(swim)",[["游泳","yóu yǒng","swim"],["泳衣","yǒng yī","swimsuit"]]],
+[144,"洲","continent","zhōu","州 hints sound — 亚洲(Asia)",[["亚洲","yà zhōu","Asia"],["非洲","fēi zhōu","Africa"],["欧洲","ōu zhōu","Europe"]]],
+[145,"沼","marsh/swamp","zhǎo","",[["沼泽","zhǎo zé","marsh/swamp"]]],
+[146,"沙","sand","shā","→砂(shā) — 沙滩(beach)",[["沙漠","shā mò","desert"],["沙滩","shā tān","beach"],["沙发","shā fā","sofa"]]],
+[147,"江","river (large)","jiāng","工 hints sound",[["长江","cháng jiāng","Yangtze River"],["江南","jiāng nán","south of Yangtze"]]],
+[148,"汁","juice","zhī","十 hints sound",[["果汁","guǒ zhī","fruit juice"],["橙汁","chéng zhī","orange juice"]]],
+[149,"潮","tide/trend","cháo","朝 hints sound — 潮流(trend)",[["潮流","cháo liú","trend/current"],["时潮","shí cháo","fashion/trend"]]],
+[150,"源","source","yuán","原 hints sound — 来源(source)",[["来源","lái yuán","source/origin"],["资源","zī yuán","resource"],["根源","gēn yuán","root cause"]]],
+[151,"活","live/lively","huó","舌 hints sound — 生活(life)",[["生活","shēng huó","life/livelihood"],["活动","huó dòng","activity"],["活泼","huó po","lively"]]],
+[152,"消","disappear","xiāo","肖 hints sound — 消息(news)",[["消息","xiāo xi","news/information"],["消费","xiāo fèi","spend/consume"],["取消","qǔ xiāo","cancel"]]],
+[153,"河","river","hé","可 hints sound — 河流(river)",[["河流","hé liú","river"],["黄河","huáng hé","Yellow River"]]],
+[154,"鱼","fish","yú","→渔(yú) — 鱼肉(fish meat)",[["金鱼","jīn yú","goldfish"],["钓鱼","diào yú","go fishing"],["鱼肉","yú ròu","fish meat"]]],
+[155,"渔","fishing","yú","鱼 hints sound",[["渔民","yú mín","fisherman"],["渔村","yú cūn","fishing village"]]],
+[156,"湖","lake","hú","胡 hints sound — 湖边(lakeside)",[["西湖","xī hú","West Lake"],["湖边","hú biān","lakeside"],["湖南","hú nán","Hunan"]]],
+[157,"测","measure","cè","则 hints sound — 测试(test)",[["测试","cè shì","test/examine"],["测量","cè liáng","measure"],["预测","yù cè","predict"]]],
+[158,"土","earth/soil","tǔ","Semantic radical: ground — 土地(land)",[["土地","tǔ dì","land/earth"],["土豆","tǔ dòu","potato"],["本土","běn tǔ","local/native"]]],
+[159,"均","even/all","jūn","匀 hints sound",[["均匀","jūn yún","even/uniform"],["平均","píng jūn","average"]]],
+[160,"肚","belly","dù","土 hints sound — 肚子(belly)",[["肚子","dù zi","belly/stomach"]]],
+[161,"尘","dust","chén","— 灰尘(dust)",[["灰尘","huī chén","dust"],["防尘","fáng chén","dustproof"]]],
+[162,"填","fill","tián","真 hints sound — 填写(fill in)",[["填写","tián xiě","fill in (form)"],["填满","tián mǎn","fill up"]]],
+[163,"吐","spit/vomit","tǔ/tù","土 hints sound",[["呕吐","ǒu tù","vomit"],["吐露","tǔ lù","reveal/disclose"]]],
+[164,"压","press","yā","— 压力(pressure)",[["压力","yā lì","pressure/stress"],["气压","qì yā","air pressure"]]],
+[165,"哇","wow","wā","",[["哇塞","wā sāi","wow! (slang)"]]],
+[166,"寸","inch/tiny","cùn","→村(cūn)存(cún)寺(sì) — 寸步(every step)",[["寸步","cùn bù","a single step"]]],
+[167,"封","seal/letter","fēng","— 一封信(a letter)",[["一封信","yī fēng xìn","a letter"],["信封","xìn fēng","envelope"]]],
+[168,"时","time/hour","shí","寺 hints sound — 时间(time)",[["时间","shí jiān","time"],["时候","shí hou","moment/time"],["有时","yǒu shí","sometimes"]]],
+[169,"寺","temple","sì","→诗(shī)持(chí)特(tè)等(děng)时(shí)",[["寺庙","sì miào","temple"],["少林寺","shào lín sì","Shaolin Temple"]]],
+[170,"火","fire","huǒ","Semantic radical: fire/heat — 火车(train)",[["火车","huǒ chē","train"],["火锅","huǒ guō","hot pot"],["生火","shēng huǒ","make fire"]]],
+[171,"灭","extinguish","miè","— 消灭(eliminate)",[["消灭","xiāo miè","eliminate"],["灭火","miè huǒ","extinguish fire"]]],
+[172,"灰","ash/gray","huī","→恢(huī) — 灰色(gray)",[["灰色","huī sè","gray color"],["灰尘","huī chén","dust"],["灰心","huī xīn","discouraged"]]],
+[173,"烦","annoyed","fán","— 烦恼(annoyance)",[["烦恼","fán nǎo","annoyance/worry"],["麻烦","má fan","trouble/bother"]]],
+[174,"炎","flame/inflammation","yán","→谈(tán)淡(dàn)",[["炎热","yán rè","scorching hot"],["发炎","fā yán","inflammation"]]],
+[175,"淡","light/bland","dàn","炎 hints sound — 淡水(fresh water)",[["淡水","dàn shuǐ","fresh water"],["冷淡","lěng dàn","cold/indifferent"]]],
+[176,"灯","lamp","dēng","丁 hints sound — 灯光(light)",[["灯光","dēng guāng","lamp light"],["电灯","diàn dēng","electric light"],["红绿灯","hóng lǜ dēng","traffic light"]]],
+[177,"点","dot/point","diǎn","占 hints sound — 一点(a little)",[["一点","yī diǎn","a little"],["点菜","diǎn cài","order food"],["重点","zhòng diǎn","key point"]]],
+[178,"照","illuminate/photo","zhào","召 hints sound — 照片(photo)",[["照片","zhào piàn","photo"],["照顾","zhào gù","take care of"],["按照","àn zhào","according to"]]],
+[179,"里","inside/li","lǐ","→理(lǐ)厘(lí) — 里面(inside)",[["里面","lǐ miàn","inside"],["这里","zhè lǐ","here"],["心里","xīn lǐ","in one's heart"]]],
+[180,"量","measure/amount","liàng/liáng","→粮(liáng) — 数量(quantity)",[["数量","shù liàng","quantity"],["质量","zhì liàng","quality"],["重量","zhòng liàng","weight"]]],
+[181,"埋","bury","mái/mán","里 hints sound",[["埋葬","mái zàng","bury"]]],
+[182,"墨","ink/black","mò","",[["墨水","mò shuǐ","ink"],["墨镜","mò jìng","sunglasses"]]],
+[183,"黑","black","hēi","→墨(mò) — 黑色(black)",[["黑色","hēi sè","black"],["黑暗","hēi àn","darkness"],["黑板","hēi bǎn","blackboard"]]],
+[184,"冒","risk/emit","mào","→帽(mào)",[["冒险","mào xiǎn","take a risk"],["感冒","gǎn mào","catch a cold"]]],
+[185,"同","same/together","tóng","→铜(tóng)洞(dòng) — 同学(classmate)",[["同学","tóng xué","classmate"],["同时","tóng shí","at the same time"],["不同","bù tóng","different"]]],
+[186,"洞","cave/hole","dòng","同 hints sound",[["山洞","shān dòng","cave"],["黑洞","hēi dòng","black hole"]]],
+[187,"丽","beautiful","lì","— 美丽(beautiful)",[["美丽","měi lì","beautiful"],["丽人","lì rén","beautiful person"]]],
+[188,"向","toward/direction","xiàng","→响(xiǎng) — 方向(direction)",[["方向","fāng xiàng","direction"],["一向","yī xiàng","always"],["向往","xiàng wǎng","yearn for"]]],
+[189,"响","sound/respond","xiǎng","向 hints sound — 响声(sound)",[["影响","yǐng xiǎng","influence"],["响声","xiǎng shēng","noise"]]],
+[190,"尚","esteem/yet","shàng","→常(cháng)堂(táng)",[["尚未","shàng wèi","not yet"],["高尚","gāo shàng","noble"],["时尚","shí shàng","fashionable"]]],
+[191,"字","character/word","zì","— 汉字(Chinese character)",[["汉字","hàn zì","Chinese character"],["字典","zì diǎn","dictionary"],["文字","wén zì","writing"]]],
+[192,"守","guard","shǒu","— 守护(guard)",[["守护","shǒu hù","guard/protect"],["遵守","zūn shǒu","abide by"]]],
+[193,"完","complete/finish","wán","→院(yuàn)玩(wán)顽(wán) — 完成(complete)",[["完成","wán chéng","complete/finish"],["完全","wán quán","completely"]]],
+[194,"灾","disaster","zāi","— 自然灾害(natural disaster)",[["灾害","zāi hài","disaster"],["自然灾害","zì rán zāi hài","natural disaster"]]],
+[195,"宣","declare","xuān","",[["宣布","xuān bù","announce/declare"],["宣传","xuān chuán","promote/publicize"]]],
+[196,"宵","night","xiāo","肖 hints sound — 元宵(Lantern Festival)",[["元宵","yuán xiāo","Lantern Festival"],["通宵","tōng xiāo","all night long"]]],
+[197,"安","peaceful","ān","→按(àn)案(àn)暗(àn) — 安全(safe)",[["安全","ān quán","safe/safety"],["安心","ān xīn","at ease"],["安静","ān jìng","quiet/calm"]]],
+[198,"宴","banquet","yàn","",[["宴会","yàn huì","banquet"]]],
+[199,"寄","send/lodge","jì","奇 hints sound — 寄信(mail letter)",[["寄信","jì xìn","mail a letter"],["寄托","jì tuō","place hope in"]]],
+[200,"富","rich/wealthy","fù","→副(fù) — 富有(wealthy)",[["富有","fù yǒu","wealthy"],["丰富","fēng fù","rich/abundant"]]],
+[201,"贮","store/hoard","zhù","",[["贮存","zhù cún","store/preserve"]]],
+[202,"木","tree/wood","mù","Semantic radical: wood/tree",[["木头","mù tou","wood/blockhead"],["树木","shù mù","trees"]]],
+[203,"林","forest","lín","→淋(lín)霖(lín) — 树林(woods)",[["树林","shù lín","woods"],["森林","sēn lín","forest"]]],
+[204,"森","dense forest","sēn","— 森林(forest)",[["森林","sēn lín","forest"],["阴森","yīn sēn","eerie/gloomy"]]],
+[205,"梦","dream","mèng","— 做梦(dream)",[["做梦","zuò mèng","dream"],["梦想","mèng xiǎng","dream/aspiration"]]],
+[206,"机","machine/opportunity","jī","几 hints sound — 手机(phone)飞机(airplane)",[["手机","shǒu jī","mobile phone"],["飞机","fēi jī","airplane"],["机会","jī huì","opportunity"]]],
+[207,"植","plant/grow","zhí","直 hints sound — 植物(plant)",[["植物","zhí wù","plant"],["种植","zhòng zhí","plant/grow"]]],
+[208,"杏","apricot","xìng","",[["杏仁","xìng rén","almond"],["杏花","xìng huā","apricot blossom"]]],
+[209,"呆","dull/stay","dāi","",[["发呆","fā dāi","stare blankly/space out"]]],
+[210,"枯","wither/dry","kū","古 hints sound",[["枯燥","kū zào","dry/boring"],["干枯","gān kū","dry/withered"]]],
+[211,"村","village","cūn","寸 hints sound — 农村(village)",[["农村","nóng cūn","rural area/village"],["村庄","cūn zhuāng","village"]]],
+[212,"相","mutual/appearance","xiāng/xiàng","→想(xiǎng)箱(xiāng) — 相互(mutual)",[["相互","xiāng hù","mutual"],["照相","zhào xiāng","take a photo"],["相信","xiāng xìn","believe"]]],
+[213,"本","root/origin","běn","→笨(bèn) — 日本(Japan)",[["日本","rì běn","Japan"],["本来","běn lái","originally"],["基本","jī běn","basic"]]],
+[214,"案","case/table","àn","安 hints sound — 方案(plan)",[["方案","fāng àn","plan/scheme"],["案例","àn lì","case/example"]]],
+[215,"未","not yet","wèi","→味(wèi)妹(mèi) — 未来(future)",[["未来","wèi lái","future"],["未必","wèi bì","not necessarily"]]],
+[216,"末","end/tip","mò","→沫(mò) — 末尾(end)",[["周末","zhōu mò","weekend"],["末尾","mò wěi","end/tail"]]],
+[217,"沫","foam","mò","末 hints sound",[["泡沫","pào mò","foam/bubble"]]],
+[218,"味","taste/flavor","wèi","未 hints sound — 味道(flavor)",[["味道","wèi dào","taste/flavor"],["口味","kǒu wèi","taste preference"]]],
+[219,"妹","younger sister","mèi","未 hints sound — 妹妹(younger sister)",[["妹妹","mèi mei","younger sister"]]],
+[220,"查","examine","chá","— 检查(check)",[["检查","jiǎn chá","check/inspect"],["调查","diào chá","investigate"],["查询","chá xún","inquire"]]],
+[221,"渣","residue","zhā","查 hints sound",[["豆渣","dòu zhā","bean dregs"]]],
+[222,"染","dye/infect","rǎn","— 感染(infect)",[["感染","gǎn rǎn","infect"],["污染","wū rǎn","pollution"]]],
+[223,"李","plum/surname Li","lǐ","— 李子(plum)",[["行李","xíng li","luggage"]]],
+[224,"桌","table","zhuō","卓 hints sound — 桌子(table)",[["桌子","zhuō zi","table"],["桌面","zhuō miàn","desktop"]]],
+[225,"杂","mixed/misc","zá","— 杂志(magazine)",[["杂志","zá zhì","magazine"],["复杂","fù zá","complex"]]],
+[226,"若","if/like","ruò","",[["若是","ruò shì","if/in case"]]],
+[227,"草","grass","cǎo","早 hints sound — 草地(lawn)",[["草地","cǎo dì","lawn"],["草稿","cǎo gǎo","draft"]]],
+[228,"艺","art/skill","yì","乙 hints sound — 艺术(art)",[["艺术","yì shù","art"],["手艺","shǒu yì","handicraft/skill"]]],
+[229,"苦","bitter/hard","kǔ","古 hints sound — 苦瓜(bitter melon)",[["苦瓜","kǔ guā","bitter melon"],["辛苦","xīn kǔ","hard work"],["痛苦","tòng kǔ","pain/suffering"]]],
+[230,"宽","wide/lenient","kuān","— 宽广(vast)",[["宽广","kuān guǎng","vast/broad"],["宽容","kuān róng","tolerant"]]],
+[231,"莫","don't/no one","mò","→模(mó)漠(mò)墓(mù)摸(mō)",[["莫名其妙","mò míng qí miào","inexplicable"]]],
+[232,"模","model/imitate","mó/mú","莫 hints sound",[["模型","mó xíng","model"],["模仿","mó fǎng","imitate"],["规模","guī mó","scale"]]],
+[233,"漠","desert/indifferent","mò","莫 hints sound — 沙漠(desert)",[["沙漠","shā mò","desert"],["冷漠","lěng mò","indifferent"]]],
+[234,"墓","grave/tomb","mù","莫 hints sound",[["墓地","mù dì","cemetery"],["扫墓","sǎo mù","sweep the grave"]]],
+[235,"苗","sprout/seedling","miáo","→描(miáo)瞄(miáo) — 幼苗(seedling)",[["幼苗","yòu miáo","seedling"],["苗条","miáo tiáo","slim/slender"]]],
+[236,"瞄","aim/target","miáo","苗 hints sound",[["瞄准","miáo zhǔn","take aim at"]]],
+[237,"兆","omen/trillion","zhào","→跳(tiào)桃(táo)逃(táo)挑(tiāo)",[["预兆","yù zhào","omen/sign"]]],
+[238,"桃","peach","táo","兆 hints sound — 桃子(peach)",[["桃子","táo zi","peach"],["核桃","hé táo","walnut"]]],
+[239,"犬","dog","quǎn","Semantic radical: dog",[["猎犬","liè quǎn","hunting dog"]]],
+[240,"尤","especially","yóu","→就(jiù)",[["尤其","yóu qí","especially/particularly"]]],
+[241,"厌","detest","yàn","— 厌烦(tired of)",[["厌烦","yàn fán","tired of/annoyed"],["讨厌","tǎo yàn","annoying/hate"]]],
+[242,"状","shape/condition","zhuàng","— 状态(state/condition)",[["状态","zhuàng tài","state/condition"],["症状","zhèng zhuàng","symptom"]]],
+[243,"妆","makeup","zhuāng","→装(zhuāng)",[["化妆","huà zhuāng","put on makeup"],["化妆品","huà zhuāng pǐn","cosmetics"]]],
+[244,"将","will/general","jiāng/jiàng","→浆(jiāng)酱(jiàng) — 将来(future)",[["将来","jiāng lái","future"],["将要","jiāng yào","be about to"]]],
+[245,"获","get/harvest","huò","— 获得(obtain)",[["获得","huò dé","obtain/gain"],["收获","shōu huò","harvest/gain"]]],
+[246,"默","silent","mò","黑 hints sound — 默默(silently)",[["沉默","chén mò","silence/silent"],["默默","mò mò","silently"]]],
+[247,"然","like that/natural","rán","→燃(rán) — 当然(of course)",[["当然","dāng rán","of course"],["自然","zì rán","nature/natural"],["虽然","suī rán","although"]]],
+[248,"哭","cry/weep","kū","— 哭泣(weep)",[["哭泣","kū qì","weep/sob"]]],
+[249,"器","instrument/vessel","qì","— 乐器(instrument)",[["乐器","yuè qì","musical instrument"],["武器","wǔ qì","weapon"]]],
+[250,"臭","smelly","chòu/xiù","",[["臭豆腐","chòu dòu fu","stinky tofu"]]],
+[251,"狗","dog","gǒu","句 hints sound — 狗狗(doggy)",[["小狗","xiǎo gǒu","puppy"],["热狗","rè gǒu","hot dog"]]],
+[252,"牛","cow/bull","niú","→物(wù)牧(mù) — 牛肉(beef)",[["牛肉","niú ròu","beef"],["牛奶","niú nǎi","milk"]]],
+[253,"特","special","tè","寺 hints sound — 特别(especially)",[["特别","tè bié","especially"],["特点","tè diǎn","characteristic"]]],
+[254,"告","announce/accuse","gào","→造(zào)浩(hào) — 告诉(tell)",[["告诉","gào su","tell/inform"],["报告","bào gào","report"],["广告","guǎng gào","advertisement"]]],
+[255,"浩","vast/grand","hào","告 hints sound",[["浩大","hào dà","vast/grand"]]],
+[256,"先","first/before","xiān","→洗(xǐ) — 先生(Mr./husband)",[["先生","xiān sheng","Mr./husband"],["首先","shǒu xiān","first of all"]]],
+[257,"洗","wash","xǐ","先 hints sound — 洗手(wash hands)",[["洗手","xǐ shǒu","wash hands"],["洗澡","xǐ zǎo","take a bath"]]],
+[258,"个","(measure word)","gè","— 一个(one)",[["一个","yī gè","one (thing/person)"],["个人","gè rén","individual"],["个子","gè zi","height"]]],
+[259,"介","between/introduce","jiè","→界(jiè)疥(jiè)",[["介绍","jiè shào","introduce"]]],
+[260,"界","boundary/world","jiè","介 hints sound — 世界(world)",[["世界","shì jiè","world"],["边界","biān jiè","border"]]],
+[261,"茶","tea","chá","— 茶叶(tea leaves)",[["茶叶","chá yè","tea leaves"],["喝茶","hē chá","drink tea"]]],
+[262,"合","join/suit","hé","→答(dá)拿(ná)盒(hé) — 合适(suitable)",[["合适","hé shì","suitable"],["合作","hé zuò","cooperate"]]],
+[263,"哈","ha/laugh","hā","合 hints sound",[["哈哈","hā hā","ha ha (laughter)"]]],
+[264,"塔","tower/pagoda","tǎ","— 塔楼(tower)",[["灯塔","dēng tǎ","lighthouse"]]],
+[265,"王","king","wáng","→旺(wàng)望(wàng) — 王国(kingdom)",[["国王","guó wáng","king"],["王国","wáng guó","kingdom"]]],
+[266,"玉","jade","yù","→国(guó)",[["玉石","yù shí","jade"],["玉米","yù mǐ","corn/maize"]]],
+[267,"宝","treasure","bǎo","— 宝贝(baby/treasure)",[["宝贝","bǎo bèi","baby/treasure"],["宝贵","bǎo guì","precious/valuable"]]],
+[268,"球","ball/sphere","qiú","求 hints sound — 地球(earth)",[["地球","dì qiú","Earth/globe"],["篮球","lán qiú","basketball"],["足球","zú qiú","soccer"]]],
+[269,"现","appear/current","xiàn","见 hints sound — 现在(now)",[["现在","xiàn zài","now"],["现实","xiàn shí","reality"],["发现","fā xiàn","discover"]]],
+[270,"玩","play","wán","完 hints sound — 玩耍(play)",[["玩耍","wán shuǎ","play"],["好玩","hǎo wán","fun/interesting"],["玩笑","wán xiào","joke"]]],
+[271,"狂","mad/wild","kuáng","— 疯狂(crazy)",[["疯狂","fēng kuáng","crazy/frantic"],["狂热","kuáng rè","fanatical"]]],
+[272,"皇","emperor","huáng","→煌(huáng)",[["皇帝","huáng dì","emperor"],["皇后","huáng hòu","empress"]]],
+[273,"煌","brilliant/bright","huáng","皇 hints sound",[["辉煌","huī huáng","brilliant/magnificent"]]],
+[274,"呈","present/show","chéng","→程(chéng)",[["呈现","chéng xiàn","present/emerge"]]],
+[275,"全","complete/all","quán","→痊(quán) — 全部(all)",[["全部","quán bù","all/entirety"],["全国","quán guó","nationwide"],["安全","ān quán","safe"]]],
+[276,"理","reason/manage","lǐ","里 hints sound — 道理(reason)",[]],
+[277,"主","master/main","zhǔ","→住(zhù)注(zhù) — 主要(main)",[]],
+[278,"注","pour/annotate","zhù","主 hints sound — 注意(attention)",[]],
+[279,"金","gold/metal","jīn","Semantic radical: metal — 黄金(gold)",[]],
+[280,"钟","clock/bell","zhōng","中 hints sound — 钟表(clock)",[]],
+[281,"铜","copper","tóng","同 hints sound",[]],
+[282,"钓","fish (v)/hook","diào","勺 hints sound",[]],
+[283,"针","needle","zhēn","十 hints sound — 针对(aimed at)",[]],
+[284,"钉","nail","dīng","丁 hints sound",[]],
+[285,"铭","engrave","míng","名 hints sound",[]],
+[286,"镇","town/suppress","zhèn","— 城镇(town)",[]],
+[287,"道","road/way","dào","→导(dǎo)盗(dào) — 知道(know)",[]],
+[288,"达","reach/attain","dá","→达到 — 达到(reach)",[]],
+[289,"远","far","yuǎn","元 hints sound — 远方(far away)",[]],
+[290,"适","suitable","shì","— 合适(suitable)",[]],
+[291,"过","cross/pass","guò","— 过去(past)",[]],
+[292,"迈","stride","mài","",[]],
+[293,"迅","swift","xùn","— 迅速(swift)",[]],
+[294,"造","make/create","zào","告 hints sound — 创造(create)",[]],
+[295,"逃","escape/flee","táo","兆 hints sound — 逃跑(flee)",[]],
+[296,"巡","patrol","xún","",[]],
+[297,"选","select/elect","xuǎn","— 选择(choose)",[]],
+[298,"逊","humble/inferior","xùn","孙 hints sound",[]],
+[299,"逛","stroll","guàng","",[]],
+[300,"车","vehicle/car","chē","→轮(lún)辆(liàng) — 火车(train)",[]],
+[301,"连","connect/even","lián","→联(lián) — 连续(consecutive)",[]],
+[302,"莲","lotus","lián","连 hints sound",[]],
+[303,"前","front/before","qián","— 以前(before)",[]],
+[304,"剪","scissors/cut","jiǎn","前 hints sound",[]],
+[305,"输","lose/transport","shū","— 运输(transport)",[]],
+[306,"逾","exceed/pass","yú","",[]],
+[307,"条","strip/item","tiáo","— 条件(condition)",[]],
+[308,"处","handle/place","chǔ/chù","— 处理(handle)",[]],
+[309,"各","each/various","gè","→格(gé)客(kè)略(lüè)路(lù)",[]],
+[310,"格","standard/grid","gé","各 hints sound — 格子(grid)",[]],
+[311,"略","scheme/omit","lüè","各 hints sound",[]],
+[312,"客","guest","kè","各 hints sound — 客人(guest)",[]],
+[313,"额","forehead/amount","é","— 额外(extra)",[]],
+[314,"夏","summer","xià","— 夏天(summer)",[]],
+[315,"洛","(place name)","luò","各 hints sound",[]],
+[316,"落","fall/settle","luò","各 hints sound — 落下(fall down)",[]],
+[317,"备","prepare/equipped","bèi","→倍(bèi) — 准备(prepare)",[]],
+[318,"冗","redundant","rǒng","",[]],
+[319,"沉","sink/heavy","chén","— 沉重(heavy)",[]],
+[320,"军","military","jūn","→运(yùn)辉(huī) — 军队(army)",[]],
+[321,"辉","radiance/shine","huī","军 hints sound",[]],
+[322,"冠","crown/champion","guān/guàn","— 冠军(champion)",[]],
+[323,"坑","pit/hole","kēng","",[]],
+[324,"亩","mu (land unit)","mǔ","",[]],
+[325,"高","tall/high","gāo","→稿(gǎo)膏(gāo)豪(háo) — 高兴(happy)",[]],
+[326,"享","enjoy","xiǎng","— 享受(enjoy)",[]],
+[327,"熟","cooked/familiar","shú/shóu","— 熟悉(familiar)",[]],
+[328,"亭","pavilion","tíng","→停(tíng)",[]],
+[329,"亮","bright","liàng","— 明亮(bright)",[]],
+[330,"京","capital city","jīng","→景(jǐng)影(yǐng)惊(jīng) — 北京(Beijing)",[]],
+[331,"景","scenery/situation","jǐng","京 hints sound — 景色(scenery)",[]],
+[332,"就","then/right away","jiù","— 就是(exactly)",[]],
+[333,"周","week/cycle","zhōu","→调(diào) — 周末(weekend)",[]],
+[334,"士","scholar/soldier","shì","→吉(jí)",[]],
+[335,"吉","lucky/auspicious","jí","→吉祥(auspicious)",[]],
+[336,"壮","strong/vigorous","zhuàng","— 强壮(strong)",[]],
+[337,"学","study/learn","xué","— 学习(study)",[]],
+[338,"觉","feel/sleep","jué/jiào","— 觉得(feel)睡觉(sleep)",[]],
+[339,"攻","attack","gōng","工 hints sound",[]],
+[340,"敌","enemy","dí","— 敌人(enemy)",[]],
+[341,"败","defeat","bài","— 失败(fail)",[]],
+[342,"故","reason/old","gù","古 hints sound — 故事(story)",[]],
+[343,"救","rescue/save","jiù","求 hints sound — 救助(rescue)",[]],
+[344,"敬","respect","jìng","— 尊敬(respect)",[]],
+[345,"敞","open/spacious","chǎng","",[]],
+[346,"言","speech/words","yán","Semantic radical: language",[]],
+[347,"警","warn/police","jǐng","— 警察(police)",[]],
+[348,"计","calculate/plan","jì","十 hints sound — 计划(plan)",[]],
+[349,"让","let/allow","ràng","— 让步(concede)",[]],
+[350,"狱","prison","yù","",[]],
+[351,"讨","seek/demand","tǎo","— 讨论(discuss)",[]],
+[352,"训","train/instruct","xùn","川 hints sound",[]],
+[353,"识","know/recognize","shí/zhì","只 hints sound — 认识(know someone)",[]],
+[354,"话","speech/words","huà","舌 hints sound — 说话(speak)",[]],
+[355,"诗","poem","shī","寺 hints sound",[]],
+[356,"语","language","yǔ","吾 hints sound — 语言(language)",[]],
+[357,"调","transfer/tune","diào/tiáo","周 hints sound — 调整(adjust)",[]],
+[358,"谈","talk/chat","tán","炎 hints sound — 谈话(conversation)",[]],
+[359,"式","style/formula","shì","→试(shì) — 方式(method)",[]],
+[360,"试","try/test","shì","式 hints sound — 考试(exam)",[]],
+[361,"戈","spear","gē","Semantic radical: weapon",[]],
+[362,"战","fight/war","zhàn","占 hints sound — 战争(war)",[]],
+[363,"划","row/plan","huá/huà","戈 hints sound",[]],
+[364,"或","or/perhaps","huò","→国(guó)域(yù)",[]],
+[365,"贼","thief","zéi","",[]],
+[366,"载","carry/year","zài/zǎi","",[]],
+[367,"茂","lush","mào","",[]],
+[368,"成","achieve/become","chéng","→城(chéng)诚(chéng) — 成功(succeed)",[]],
+[369,"城","city/wall","chéng","成 hints sound — 城市(city)",[]],
+[370,"诚","sincere","chéng","成 hints sound — 诚实(honest)",[]],
+[371,"威","power/prestige","wēi","— 威力(power)",[]],
+[372,"咸","salty/all","xián","→感(gǎn)减(jiǎn)",[]],
+[373,"钱","money","qián","浅 hints sound — 钱包(wallet)",[]],
+[374,"浅","shallow/light","qiǎn","→钱(qián)",[]],
+[375,"贱","cheap/lowly","jiàn","",[]],
+[376,"尧","(ancient emperor)","yáo","→烧(shāo)晓(xiǎo)",[]],
+[377,"烧","burn/cook","shāo","尧 hints sound — 烧饭(cook)",[]],
+[378,"晓","dawn/know","xiǎo","尧 hints sound",[]],
+[379,"止","stop","zhǐ","→址(zhǐ)趾(zhǐ) — 停止(stop)",[]],
+[380,"步","step/walk","bù","— 步骤(step)",[]],
+[381,"涉","wade/involve","shè","— 涉及(involve)",[]],
+[382,"频","frequent","pín","— 频繁(frequent)",[]],
+[383,"肯","willing","kěn","— 肯定(certainly)",[]],
+[384,"企","plan/enterprise","qǐ","— 企业(enterprise)",[]],
+[385,"武","military/martial","wǔ","— 武术(martial arts)",[]],
+[386,"赋","bestow/tax","fù","",[]],
+[387,"正","correct/straight","zhèng","→政(zhèng)整(zhěng)征(zhēng) — 正确(correct)",[]],
+[388,"证","prove/certificate","zhèng","正 hints sound — 证明(prove)",[]],
+[389,"政","politics","zhèng","正 hints sound — 政府(government)",[]],
+[390,"定","determine/settle","dìng","→锭(dìng) — 决定(decide)",[]],
+[391,"走","walk/go","zǒu","→赶(gǎn) — 走路(walk)",[]],
+[392,"超","exceed/surpass","chāo","召 hints sound — 超市(supermarket)",[]],
+[393,"越","cross/exceed","yuè","— 越来越(more and more)",[]],
+[394,"是","is/yes","shì","— 还是(or/still is)",[]],
+[395,"题","topic/problem","tí","是 hints sound — 问题(problem)",[]],
+[396,"延","extend/delay","yán","→诞(dàn)",[]],
+[397,"诞","birth/absurd","dàn","延 hints sound — 圣诞(Christmas)",[]],
+[398,"建","build","jiàn","— 建立(establish)",[]],
+[399,"楚","clear/neat","chǔ","— 清楚(clear)",[]],
+[400,"衣","clothing","yī","Semantic radical: clothing",[]],
+[401,"裁","cut/judge","cái","才 hints sound",[]],
+[402,"装","dress/pack","zhuāng","妆 hints sound — 装饰(decorate)",[]],
+[403,"哀","grief/sorrow","āi","",[]],
+[404,"袁","(surname)","yuán","",[]],
+[405,"初","initial/first","chū","— 初始(initial)",[]],
+[406,"补","mend/supplement","bǔ","— 补充(supplement)",[]],
+[407,"衬","lining/match","chèn","",[]],
+[408,"农","agriculture","nóng","→浓(nóng) — 农村(village)",[]],
+[409,"浓","thick/strong","nóng","农 hints sound — 浓厚(thick)",[]],
+[410,"巾","cloth/towel","jīn","Semantic radical: cloth",[]],
+[411,"帅","handsome/commander","shuài","",[]],
+[412,"师","master/teacher","shī","帅 hints sound — 老师(teacher)",[]],
+[413,"狮","lion","shī","师 hints sound",[]],
+[414,"布","cloth/spread","bù","— 布置(arrange)",[]],
+[415,"帜","flag/banner","zhì","",[]],
+[416,"帽","hat","mào","冒 hints sound — 帽子(hat)",[]],
+[417,"幕","curtain/act","mù","莫 hints sound",[]],
+[418,"棉","cotton","mián","",[]],
+[419,"市","city/market","shì","→柿(shì)沛(pèi) — 超市(supermarket)",[]],
+[420,"肺","lung","fèi","市 hints sound",[]],
+[421,"带","belt/bring","dài","— 带来(bring)",[]],
+[422,"滞","stagnate","zhì","带 hints sound",[]],
+[423,"刺","stab/thorn","cì","",[]],
+[424,"制","system/make","zhì","— 制度(system)",[]],
+[425,"雨","rain","yǔ","Semantic radical: weather — 下雨(rain)",[]],
+[426,"雷","thunder","léi","",[]],
+[427,"霜","frost","shuāng","",[]],
+[428,"云","cloud","yún","→运(yùn) — 云朵(cloud)",[]],
+[429,"运","transport/luck","yùn","军 hints sound — 运动(exercise)",[]],
+[430,"冰","ice","bīng","— 冰块(ice cube)",[]],
+[431,"况","condition/moreover","kuàng","兄 hints sound — 况且(moreover)",[]],
+[432,"冲","rush/rinse","chōng","中 hints sound — 冲动(impulse)",[]],
+[433,"减","subtract/reduce","jiǎn","咸 hints sound — 减少(reduce)",[]],
+[434,"凉","cool","liáng","京 hints sound — 凉快(cool)",[]],
+[435,"冬","winter","dōng","→终(zhōng) — 冬天(winter)",[]],
+[436,"天","sky/day/heaven","tiān","→添(tiān) — 天气(weather)",[]],
+[437,"吴","(place/surname)","wú","→娱(yú)误(wù)",[]],
+[438,"娱","entertain","yú","吴 hints sound — 娱乐(entertainment)",[]],
+[439,"误","mistake/delay","wù","吴 hints sound — 误解(misunderstand)",[]],
+[440,"夭","young/die young","yāo","→妖(yāo)",[]],
+[441,"乔","tall/disguise","qiáo","→桥(qiáo)娇(jiāo)",[]],
+[442,"桥","bridge","qiáo","乔 hints sound — 桥梁(bridge)",[]],
+[443,"娇","tender/charming","jiāo","乔 hints sound",[]],
+[444,"立","stand","lì","→位(wèi)站(zhàn)粒(lì)",[]],
+[445,"泣","weep","qì","立 hints sound",[]],
+[446,"站","stand/station","zhàn","占 hints sound — 站台(platform)",[]],
+[447,"章","chapter/seal","zhāng","音 hints sound — 文章(article)",[]],
+[448,"竞","compete","jìng","— 竞争(compete)",[]],
+[449,"帝","emperor","dì","",[]],
+[450,"童","child/young","tóng","— 儿童(children)",[]],
+[451,"商","trade/discuss","shāng","— 商业(commerce)",[]],
+[452,"滴","drip/drop","dī","商 hints sound — 一滴(a drop)",[]],
+[453,"匕","dagger","bǐ","Semantic primitive",[]],
+[454,"北","north","běi","→背(bèi) — 北京(Beijing)",[]],
+[455,"背","back/carry","bèi/bēi","北 hints sound — 背包(backpack)",[]],
+[456,"比","compare","bǐ","→批(pī)秕(bǐ) — 比较(compare)",[]],
+[457,"昆","elder/insect","kūn","→混(hùn)",[]],
+[458,"混","mix/muddle","hùn","昆 hints sound — 混合(mix)",[]],
+[459,"皆","all/everyone","jiē","",[]],
+[460,"此","this","cǐ","→些(xiē)紫(zǐ)",[]],
+[461,"些","some/a few","xiē","此 hints sound",[]],
+[462,"它","it","tā","",[]],
+[463,"旨","meaning/purpose","zhǐ","→脂(zhī)",[]],
+[464,"脂","fat/grease","zhī","旨 hints sound",[]],
+[465,"论","reason/discuss","lùn","仑 hints sound — 讨论(discuss)",[]],
+[466,"轮","wheel/turn","lún","仑 hints sound — 轮子(wheel)",[]],
+[467,"每","every/each","měi","→梅(méi)海(hǎi)悔(huǐ) — 每天(every day)",[]],
+[468,"梅","plum/Mei","méi","每 hints sound",[]],
+[469,"海","sea/ocean","hǎi","每 hints sound — 海边(seaside)",[]],
+[470,"乞","beg","qǐ","",[]],
+[471,"吃","eat","chī","乞 hints sound — 吃饭(eat)",[]],
+[472,"复","repeat/recover","fù","→腹(fù) — 复习(review)",[]],
+[473,"腹","belly/abdomen","fù","复 hints sound",[]],
+[474,"欠","lack/owe","qiàn","→吹(chuī)软(ruǎn)",[]],
+[475,"吹","blow","chuī","欠 hints sound — 吹风(blow wind)",[]],
+[476,"歌","song","gē","哥 hints sound — 唱歌(sing)",[]],
+[477,"软","soft","ruǎn","欠 hints sound — 软件(software)",[]],
+[478,"次","time/order","cì","→资(zī)姿(zī) — 这次(this time)",[]],
+[479,"资","resources/money","zī","次 hints sound — 投资(invest)",[]],
+[480,"姿","posture/appearance","zī","次 hints sound",[]],
+[481,"咨","consult","zī","次 hints sound",[]],
+[482,"赔","compensate","péi","培 hints sound",[]],
+[483,"培","cultivate","péi","→赔(péi) — 培养(cultivate)",[]],
+[484,"音","sound/music","yīn","→意(yì)暗(àn)章(zhāng) — 音乐(music)",[]],
+[485,"暗","dark/secret","àn","音 hints sound — 暗示(hint)",[]],
+[486,"韵","rhyme/charm","yùn","匀 hints sound",[]],
+[487,"竟","unexpectedly","jìng","→镜(jìng)境(jìng) — 竟然(surprisingly)",[]],
+[488,"镜","mirror","jìng","竟 hints sound — 镜子(mirror)",[]],
+[489,"境","situation/border","jìng","竟 hints sound — 环境(environment)",[]],
+[490,"亡","die/flee","wáng","→盲(máng)妄(wàng)忘(wàng)",[]],
+[491,"盲","blind","máng","亡 hints sound",[]],
+[492,"妄","reckless","wàng","亡 hints sound",[]],
+[493,"望","gaze/hope","wàng","亡 hints sound — 希望(hope)",[]],
+[494,"方","square/direction","fāng","→防(fáng)放(fàng)访(fǎng) — 方向(direction)",[]],
+[495,"妨","hinder","fáng","方 hints sound",[]],
+[496,"放","release/put","fàng","方 hints sound — 放松(relax)",[]],
+[497,"激","excite/drastic","jī","— 激动(excited)",[]],
+[498,"旁","side/beside","páng","— 旁边(beside)",[]],
+[499,"兑","exchange","duì","→脱(tuō)说(shuō)",[]],
+[500,"脱","take off/escape","tuō","兑 hints sound — 脱离(break away)",[]],
+[501,"说","speak/say","shuō","兑 hints sound — 说话(speak)",[]],
+[502,"曾","once/ever","céng/zēng","→增(zēng)赠(zèng) — 曾经(once)",[]],
+[503,"增","increase","zēng","曾 hints sound — 增加(increase)",[]],
+[504,"赠","give as gift","zèng","曾 hints sound",[]],
+[505,"也","also","yě","→他(tā)她(tā)地(dì)池(chí) — 也是(also is)",[]],
+[506,"她","she/her","tā","也 hints sound",[]],
+[507,"地","earth/ground","dì/de","也 hints sound — 地方(place)",[]],
+[508,"池","pool/pond","chí","也 hints sound",[]],
+[509,"虫","insect","chóng","→蛇(shé)虹(hóng)",[]],
+[510,"虾","shrimp","xiā","",[]],
+[511,"独","alone/only","dú","— 独立(independent)",[]],
+[512,"虽","although","suī","",[]],
+[513,"蛇","snake","shé","虫 hints sound",[]],
+[514,"蛋","egg","dàn","— 鸡蛋(egg)",[]],
+[515,"己","self","jǐ","→起(qǐ)改(gǎi)记(jì)",[]],
+[516,"起","rise/start","qǐ","己 hints sound — 一起(together)",[]],
+[517,"改","change","gǎi","己 hints sound — 改变(change)",[]],
+[518,"记","record/remember","jì","己 hints sound — 记住(remember)",[]],
+[519,"已","already","yǐ","→已经(already)",[]],
+[520,"包","wrap/bag","bāo","→泡(pào)饱(bǎo)抱(bào)跑(pǎo)",[]],
+[521,"泡","bubble/soak","pào","包 hints sound",[]],
+[522,"导","guide/lead","dǎo","道 hints sound — 导演(director)",[]],
+[523,"顾","look back/care","gù","— 照顾(take care of)",[]],
+[524,"逐","chase/one by one","zhú","— 逐渐(gradually)",[]],
+[525,"家","home/family","jiā","→嫁(jià)稼(jià) — 家里(at home)",[]],
+[526,"场","place/field","chǎng","易 hints sound — 市场(market)",[]],
+[527,"汤","soup/hot water","tāng","— 汤水(soup)",[]],
+[528,"羊","sheep/goat","yáng","→祥(xiáng)洋(yáng)样(yàng)",[]],
+[529,"美","beautiful","měi","→妹(mèi) — 美国(USA)",[]],
+[530,"洋","ocean/foreign","yáng","羊 hints sound — 海洋(ocean)",[]],
+[531,"鲜","fresh","xiān","— 新鲜(fresh)",[]],
+[532,"样","appearance/type","yàng","羊 hints sound — 一样(same)",[]],
+[533,"兰","orchid","lán","→烂(làn)",[]],
+[534,"烂","rotten/brilliant","làn","兰 hints sound",[]],
+[535,"差","differ/mistake","chā/chà","— 差不多(almost)",[]],
+[536,"着","(aspect marker)","zhe/zháo","",[]],
+[537,"养","raise/support","yǎng","— 养育(raise)",[]],
+[538,"集","gather/collection","jí","— 集中(concentrate)",[]],
+[539,"准","accurate/allow","zhǔn","— 准备(prepare)",[]],
+[540,"谁","who","shuí/shéi","",[]],
+[541,"售","sell","shòu","",[]],
+[542,"午","noon","wǔ","→许(xǔ)舞(wǔ) — 上午(morning)",[]],
+[543,"许","allow/many","xǔ","午 hints sound — 也许(perhaps)",[]],
+[544,"羽","feather","yǔ","→习(xí)翔(xiáng)",[]],
+[545,"习","practice","xí","羽 hints sound — 学习(study)",[]],
+[546,"翔","soar","xiáng","羽 hints sound",[]],
+[547,"困","trapped/sleepy","kùn","— 困难(difficulty)",[]],
+[548,"固","firm/solid","gù","古 hints sound — 坚固(solid)",[]],
+[549,"国","country","guó","或 hints sound — 国家(country)",[]],
+[550,"圆","round/circle","yuán","员 hints sound — 圆形(circular)",[]],
+[551,"因","cause/because","yīn","→姻(yīn)烟(yān) — 因为(because)",[]],
+[552,"烟","smoke/cigarette","yān","因 hints sound — 抽烟(smoke)",[]],
+[553,"园","garden","yuán","元 hints sound — 公园(park)",[]],
+[554,"回","return/circular","huí","→围(wéi) — 回来(come back)",[]],
+[555,"图","picture/plan","tú","— 地图(map)",[]],
+[556,"广","broad/Guangdong","guǎng","→店(diàn)库(kù)",[]],
+[557,"店","shop/store","diàn","占 hints sound — 商店(shop)",[]],
+[558,"库","storehouse","kù","广 hints sound — 仓库(warehouse)",[]],
+[559,"裤","pants/trousers","kù","库 hints sound — 裤子(pants)",[]],
+[560,"床","bed","chuáng","广 hints sound — 床上(on bed)",[]],
+[561,"麻","hemp/numb","má","— 麻木(numb)",[]],
+[562,"庄","village/solemn","zhuāng","",[]],
+[563,"心","heart/mind","xīn","Semantic radical: emotion — 心里(in heart)",[]],
+[564,"忘","forget","wàng","亡 hints sound — 忘记(forget)",[]],
+[565,"忍","endure/bear","rěn","刃 hints sound — 忍受(endure)",[]],
+[566,"总","total/always","zǒng","— 总是(always)",[]],
+[567,"态","attitude","tài","— 态度(attitude)",[]],
+[568,"志","will/aspiration","zhì","— 志愿(aspiration)",[]],
+[569,"思","think","sī","— 思考(think)",[]],
+[570,"恩","kindness/grace","ēn","因 hints sound — 感恩(gratitude)",[]],
+[571,"愿","wish/willing","yuàn","原 hints sound — 愿意(willing)",[]],
+[572,"意","meaning/intention","yì","音 hints sound — 意思(meaning)",[]],
+[573,"想","want/think","xiǎng","相 hints sound — 想法(idea)",[]],
+[574,"息","breathe/news","xī","自 hints sound — 消息(news)",[]],
+[575,"恐","fear","kǒng","孔 hints sound — 恐怕(afraid)",[]],
+[576,"感","feel/sense","gǎn","咸 hints sound — 感谢(thank)",[]],
+[577,"憾","regret","hàn","感 hints sound",[]],
+[578,"忧","worry","yōu","— 忧虑(worry)",[]],
+[579,"惊","startle","jīng","京 hints sound — 惊讶(surprised)",[]],
+[580,"怕","fear","pà","白 hints sound — 害怕(afraid)",[]],
+[581,"忙","busy","máng","亡 hints sound — 很忙(very busy)",[]],
+[582,"惯","habit/accustomed","guàn","贯 hints sound — 习惯(habit)",[]],
+[583,"必","must","bì","→秘(mì)泌(mì) — 必须(must)",[]],
+[584,"手","hand","shǒu","Semantic radical: hand — 手机(phone)",[]],
+[585,"看","look/see","kàn","",[]],
+[586,"摩","rub/grind","mó","麻 hints sound",[]],
+[587,"拿","hold/take","ná","合 hints sound",[]],
+[588,"我","I/me","wǒ","— 我们(we)",[]],
+[589,"抱","embrace/hug","bào","包 hints sound — 拥抱(hug)",[]],
+[590,"抗","resist/combat","kàng","亢 hints sound",[]],
+[591,"批","criticize/batch","pī","比 hints sound — 批评(criticize)",[]],
+[592,"招","beckon/recruit","zhāo","召 hints sound — 招聘(recruit)",[]],
+[593,"打","hit/do","dǎ","丁 hints sound — 打电话(call)",[]],
+[594,"指","finger/point","zhǐ","旨 hints sound — 指出(point out)",[]],
+[595,"持","hold/maintain","chí","寺 hints sound — 坚持(persist)",[]],
+[596,"担","carry/worry","dān/dàn","旦 hints sound — 担心(worry)",[]],
+[597,"括","include","kuò","舌 hints sound — 包括(include)",[]],
+[598,"提","lift/mention","tí","是 hints sound — 提高(improve)",[]],
+[599,"挥","wave/direct","huī","军 hints sound — 指挥(command)",[]],
+[600,"推","push","tuī","隹 hints sound — 推动(promote)",[]],
+[601,"搅","stir/disturb","jiǎo","",[]],
+[602,"执","grasp/execute","zhí","丸 hints sound — 执行(execute)",[]],
+[603,"热","hot","rè","— 热情(enthusiasm)",[]],
+[604,"接","receive/connect","jiē","妾 hints sound — 接受(accept)",[]],
+[605,"挂","hang","guà","卦 hints sound — 挂上(hang up)",[]],
+[606,"按","press/according to","àn","安 hints sound — 按照(according to)",[]],
+[607,"掉","fall/drop","diào","卓 hints sound — 掉下来(fall down)",[]],
+[608,"拉","pull","lā","立 hints sound — 拉开(pull open)",[]],
+[609,"啦","(particle)","la","",[]],
+[610,"找","look for","zhǎo","戈 hints sound — 找到(find)",[]],
+[611,"无","no/without","wú","— 无论(regardless)",[]],
+[612,"抚","stroke/comfort","fǔ","夫 hints sound",[]],
+[613,"开","open","kāi","— 开始(begin)",[]],
+[614,"研","grind/study","yán","开 hints sound — 研究(research)",[]],
+[615,"弄","play/alley","nòng/lòng","",[]],
+[616,"异","different/strange","yì","— 差异(difference)",[]],
+[617,"鼻","nose","bí","自 hints sound",[]],
+[618,"刑","punishment","xíng","井 hints sound",[]],
+[619,"型","type/model","xíng","刑 hints sound — 类型(type)",[]],
+[620,"才","talent/just now","cái","→材(cái)财(cái) — 才能(talent)",[]],
+[621,"财","wealth/money","cái","才 hints sound — 财产(property)",[]],
+[622,"团","group/ball","tuán","— 团队(team)",[]],
+[623,"存","exist/store","cún","寸 hints sound — 存在(exist)",[]],
+[624,"在","exist/at","zài","— 现在(now)",[]],
+[625,"乃","thus/then","nǎi","",[]],
+[626,"奶","milk/grandma","nǎi","乃 hints sound — 奶奶(grandma)",[]],
+[627,"及","reach/and","jí","→吸(xī)极(jí) — 及时(timely)",[]],
+[628,"吸","absorb/inhale","xī","及 hints sound — 吸引(attract)",[]],
+[629,"极","extreme/pole","jí","及 hints sound — 极其(extremely)",[]],
+[630,"史","history","shǐ","→使(shǐ)驶(shǐ) — 历史(history)",[]],
+[631,"更","more/change","gèng/gēng","",[]],
+[632,"硬","hard/firm","yìng","更 hints sound",[]],
+[633,"又","again/also","yòu","→圣(shèng)友(yǒu)双(shuāng)",[]],
+[634,"圣","holy/saint","shèng","— 圣诞(Christmas)",[]],
+[635,"友","friend","yǒu","又 hints sound — 朋友(friend)",[]],
+[636,"双","pair/double","shuāng","又 hints sound — 双手(both hands)",[]],
+[637,"汉","Han/Chinese","hàn","— 汉字(Chinese character)",[]],
+[638,"戏","play/drama","xì","又 hints sound — 游戏(game)",[]],
+[639,"观","observe","guān","又 hints sound — 观看(watch)",[]],
+[640,"欢","joyful","huān","又 hints sound — 欢迎(welcome)",[]],
+[641,"怪","strange/blame","guài","",[]],
+[642,"对","correct/toward","duì","→树(shù) — 对不起(sorry)",[]],
+[643,"树","tree/establish","shù","寸 hints sound — 树木(trees)",[]],
+[644,"难","difficult","nán/nàn","— 困难(difficulty)",[]],
+[645,"摊","spread out/stall","tān","",[]],
+[646,"投","throw/invest","tóu","— 投资(invest)",[]],
+[647,"没","no/not have","méi/mò","— 没有(not have)",[]],
+[648,"设","set up","shè","— 设计(design)",[]],
+[649,"股","share/thigh","gǔ","",[]],
+[650,"支","branch/support","zhī","→技(jì)枝(zhī) — 支持(support)",[]],
+[651,"技","skill","jì","支 hints sound — 技术(technology)",[]],
+[652,"枝","branch","zhī","支 hints sound",[]],
+[653,"叔","uncle","shū","→督(dū)",[]],
+[654,"督","oversee","dū","叔 hints sound — 监督(supervise)",[]],
+[655,"寂","lonely/quiet","jì","叔 hints sound",[]],
+[656,"反","reverse/oppose","fǎn","→饭(fàn)板(bǎn)返(fǎn) — 反对(oppose)",[]],
+[657,"板","board/stiff","bǎn","反 hints sound — 黑板(blackboard)",[]],
+[658,"返","return","fǎn","反 hints sound — 返回(return)",[]],
+[659,"后","behind/after","hòu","→候(hòu) — 以后(after)",[]],
+[660,"质","substance/quality","zhì","— 质量(quality)",[]],
+[661,"派","faction/send","pài","",[]],
+[662,"乐","joy/music","lè/yuè","→药(yào) — 音乐(music)",[]],
+[663,"爪","claw","zhǎo/zhuǎ","→抓(zhuā)采(cǎi)",[]],
+[664,"抓","grab/catch","zhuā","爪 hints sound — 抓住(grab hold)",[]],
+[665,"采","pick/gather","cǎi","爪 hints sound — 采用(adopt)",[]],
+[666,"菜","vegetable/dish","cài","采 hints sound — 蔬菜(vegetables)",[]],
+[667,"受","receive/suffer","shòu","→授(shòu) — 接受(accept)",[]],
+[668,"授","grant/teach","shòu","受 hints sound — 教授(professor)",[]],
+[669,"爱","love","ài","— 爱好(hobby)",[]],
+[670,"么","(question suffix)","me","— 什么(what)怎么(how)",[]],
+[671,"雄","male/powerful","xióng","",[]],
+[672,"台","platform/Taiwan","tái","→治(zhì)始(shǐ)",[]],
+[673,"治","govern/cure","zhì","台 hints sound — 政治(politics)",[]],
+[674,"始","begin","shǐ","台 hints sound — 开始(begin)",[]],
+[675,"去","go","qù","→法(fǎ)却(què) — 回去(go back)",[]],
+[676,"法","method/law","fǎ","去 hints sound — 方法(method)",[]],
+[677,"会","meet/can","huì","→绘(huì) — 机会(opportunity)",[]],
+[678,"至","to/arrive","zhì","→室(shì)到(dào)",[]],
+[679,"室","room","shì","至 hints sound — 教室(classroom)",[]],
+[680,"到","arrive","dào","至 hints sound — 到达(arrive)",[]],
+[681,"互","mutual","hù","— 互相(each other)",[]],
+[682,"充","fill/full","chōng","→统(tǒng)",[]],
+[683,"育","raise/educate","yù","— 教育(education)",[]],
+[684,"流","flow","liú","— 流行(popular)",[]],
+[685,"梳","comb","shū","",[]],
+[686,"购","purchase","gòu","句 hints sound — 购买(purchase)",[]],
+[687,"构","construct","gòu","句 hints sound — 结构(structure)",[]],
+[688,"山","mountain","shān","→仙(xiān)汕(shàn)",[]],
+[689,"出","exit/out","chū","— 出来(come out)",[]],
+[690,"础","foundation/base","chǔ","出 hints sound — 基础(foundation)",[]],
+[691,"岁","year (of age)","suì","— 多少岁(how old)",[]],
+[692,"密","secret/close","mì","",[]],
+[693,"入","enter","rù","— 进入(enter)",[]],
+[694,"分","divide/minute","fēn/fèn","→纷(fēn)份(fèn)芬(fēn) — 分开(separate)",[]],
+[695,"贫","poor","pín","分 hints sound",[]],
+[696,"公","public/male","gōng","→松(sōng)谷(gǔ) — 公司(company)",[]],
+[697,"松","loose/pine","sōng","公 hints sound — 放松(relax)",[]],
+[698,"谷","valley/grain","gǔ","公 hints sound",[]],
+[699,"浴","bathe","yù","谷 hints sound — 洗澡(bathe)",[]],
+[700,"欲","desire/want","yù","谷 hints sound",[]],
+[701,"容","contain/tolerate","róng","→溶(róng)融(róng) — 容易(easy)",[]],
+[702,"溶","dissolve","róng","容 hints sound",[]],
+[703,"赏","appreciate/reward","shǎng","",[]],
+[704,"党","party/faction","dǎng","— 党员(party member)",[]],
+[705,"常","often/normal","cháng","尚 hints sound — 经常(often)",[]],
+[706,"堂","hall","táng","尚 hints sound",[]],
+[707,"皮","skin/leather","pí","→波(bō)破(pò)婆(pó)",[]],
+[708,"波","wave","bō","皮 hints sound",[]],
+[709,"婆","old woman/wife","pó","皮 hints sound — 婆婆(mother-in-law)",[]],
+[710,"破","break","pò","皮 hints sound — 破坏(destroy)",[]],
+[711,"被","by (passive)/quilt","bèi","皮 hints sound",[]],
+[712,"歹","bad/wicked","dǎi","Semantic radical: death/bad",[]],
+[713,"列","row/arrange","liè","歹 hints sound — 排列(arrange)",[]],
+[714,"烈","fierce/intense","liè","歹 hints sound",[]],
+[715,"死","die/dead","sǐ","— 死亡(death)",[]],
+[716,"葬","bury","zàng","",[]],
+[717,"耳","ear","ěr","Semantic radical: hearing — 耳朵(ear)",[]],
+[718,"取","take/get","qǔ","耳 hints sound — 取得(obtain)",[]],
+[719,"趣","interest/fun","qù","取 hints sound — 有趣(interesting)",[]],
+[720,"最","most","zuì","— 最好(best)",[]],
+[721,"职","position/duty","zhí","— 职业(profession)",[]],
+[722,"敢","dare","gǎn","",[]],
+[723,"曼","graceful","màn","→慢(màn)漫(màn)",[]],
+[724,"慢","slow","màn","曼 hints sound — 慢慢(slowly)",[]],
+[725,"漫","overflow/casual","màn","曼 hints sound — 漫画(comic)",[]],
+[726,"夫","husband/man","fū","→规(guī)失(shī)",[]],
+[727,"规","rule/regulate","guī","夫 hints sound — 规定(regulation)",[]],
+[728,"替","replace/for","tì","",[]],
+[729,"失","lose","shī","夫 hints sound — 失去(lose)",[]],
+[730,"铁","iron","tiě","失 hints sound — 钢铁(steel)",[]],
+[731,"臣","minister/subject","chén","",[]],
+[732,"力","strength","lì","→历(lì)励(lì)勒(lē) — 努力(work hard)",[]],
+[733,"边","side/edge","biān","→边(biān) — 旁边(beside)",[]],
+[734,"势","situation/power","shì","执 hints sound",[]],
+[735,"动","move","dòng","重 hints sound — 运动(exercise)",[]],
+[736,"励","encourage","lì","力 hints sound",[]],
+[737,"历","past/experience","lì","力 hints sound — 历史(history)",[]],
+[738,"另","other/separate","lìng","→令(lìng) — 另外(in addition)",[]],
+[739,"别","separate/don't","bié","另 hints sound — 别人(others)",[]],
+[740,"拐","turn/kidnap","guǎi","",[]],
+[741,"男","male/man","nán","田 hints sound — 男人(man)",[]],
+[742,"功","achievement","gōng","工 hints sound — 成功(succeed)",[]],
+[743,"办","handle/manage","bàn","— 办法(method)",[]],
+[744,"协","cooperate","xié","— 协议(agreement)",[]],
+[745,"苏","revive","sū","",[]],
+[746,"为","for/be","wèi/wéi","→伪(wěi) — 为了(for)",[]],
+[747,"奴","slave","nú","→努(nǔ)",[]],
+[748,"努","exert","nǔ","奴 hints sound — 努力(work hard)",[]],
+[749,"加","add","jiā","→架(jià)驾(jià) — 增加(increase)",[]],
+[750,"贺","congratulate","hè","加 hints sound",[]],
+[751,"架","frame/shelf","jià","加 hints sound",[]],
+[752,"务","affairs/must","wù","→雾(wù) — 服务(service)",[]],
+[753,"雾","fog/mist","wù","务 hints sound",[]],
+[754,"行","carry out/walk","xíng/háng","→街(jiē) — 行动(action)",[]],
+[755,"律","regulation","lǜ","聿 hints sound — 法律(law)",[]],
+[756,"得","get/can","dé/de/děi","→德(dé) — 得到(obtain)",[]],
+[757,"待","wait/treat","dài/dāi","— 等待(wait)",[]],
+[758,"往","toward/past","wǎng","— 往来(come and go)",[]],
+[759,"德","virtue/Germany","dé","得 hints sound — 道德(morality)",[]],
+[760,"微","tiny/slight","wēi","— 微信(WeChat)",[]],
+[761,"街","street","jiē","行 hints sound",[]],
+[762,"禾","grain","hé","→和(hé)科(kē)移(yí)",[]],
+[763,"程","journey/process","chéng","呈 hints sound — 过程(process)",[]],
+[764,"和","and/harmony","hé","禾 hints sound — 和平(peace)",[]],
+[765,"积","accumulate","jī","责 hints sound — 积累(accumulate)",[]],
+[766,"种","seed/type","zhǒng/zhòng","中 hints sound — 种类(type)",[]],
+[767,"移","move/shift","yí","禾 hints sound — 移动(move)",[]],
+[768,"秋","autumn/fall","qiū","禾 hints sound — 秋天(autumn)",[]],
+[769,"愁","worry/sorrow","chóu","秋 hints sound",[]],
+[770,"揪","clutch/pick","jiū","秋 hints sound",[]],
+[771,"利","benefit/sharp","lì","禾 hints sound — 利用(utilize)",[]],
+[772,"香","fragrant","xiāng","禾 hints sound — 香港(Hong Kong)",[]],
+[773,"季","season","jì","子 hints sound — 季节(season)",[]],
+[774,"委","entrust/droop","wěi","禾 hints sound",[]],
+[775,"秀","elegant/excellent","xiù","→透(tòu)诱(yòu)",[]],
+[776,"透","transparent/through","tòu","秀 hints sound — 透明(transparent)",[]],
+[777,"诱","induce/tempt","yòu","秀 hints sound",[]],
+[778,"米","rice/meter","mǐ","Semantic radical: grain — 白米(white rice)",[]],
+[779,"粉","powder/pink","fěn","分 hints sound — 粉红(pink)",[]],
+[780,"迷","lost/fan","mí","米 hints sound — 迷路(get lost)",[]],
+[781,"谜","riddle","mí","米 hints sound",[]],
+[782,"类","type/category","lèi","— 类型(type)",[]],
+[783,"来","come","lái","— 回来(come back)",[]],
+[784,"数","count/number","shù/shǔ","娄 hints sound — 数量(quantity)",[]],
+[785,"楼","building/floor","lóu","娄 hints sound — 楼上(upstairs)",[]],
+[786,"竹","bamboo","zhú","Semantic radical: bamboo",[]],
+[787,"笑","laugh/smile","xiào","— 好笑(funny)笑一个(smile)",[]],
+[788,"箱","box/trunk","xiāng","相 hints sound — 箱子(box)",[]],
+[789,"等","wait/equal","děng","寺 hints sound — 等一下(wait)",[]],
+[790,"算","calculate/count","suàn","— 计算(calculate)",[]],
+[791,"答","answer","dá","合 hints sound — 回答(answer)",[]],
+[792,"策","plan/policy","cè","— 政策(policy)",[]],
+[793,"人","person","rén","Semantic radical: human — 人们(people)",[]],
+[794,"认","recognize","rèn","忍 hints sound — 认识(know)",[]],
+[795,"价","value/price","jià","介 hints sound — 价格(price)",[]],
+[796,"份","portion/share","fèn","分 hints sound",[]],
+[797,"伪","false/forged","wěi","为 hints sound",[]],
+[798,"尔","you (classical)","ěr","",[]],
+[799,"你","you","nǐ","尔 hints sound — 你好(hello)",[]],
+[800,"您","you (respectful)","nín","",[]],
+[801,"称","call/weigh","chēng","",[]],
+[802,"什","what (in 什么)","shén","十 hints sound — 什么(what)",[]],
+[803,"值","worth/on duty","zhí","直 hints sound — 值得(worth it)",[]],
+[804,"做","do/make","zuò","",[]],
+[805,"但","but/however","dàn","旦 hints sound — 但是(but)",[]],
+[806,"住","live/stay","zhù","主 hints sound — 住在(live at)",[]],
+[807,"位","position/place","wèi","立 hints sound — 位置(position)",[]],
+[808,"件","item/matter","jiàn","牛 hints sound — 条件(condition)",[]],
+[809,"仍","still/yet","réng","",[]],
+[810,"他","he/him","tā","也 hints sound — 他们(they)",[]],
+[811,"仅","only/merely","jǐn","",[]],
+[812,"休","rest","xiū","— 休息(rest)",[]],
+[813,"体","body/form","tǐ","— 身体(body)",[]],
+[814,"信","trust/letter","xìn","— 相信(believe)",[]],
+[815,"依","depend/according to","yī","",[]],
+[816,"例","example/case","lì","— 例如(for example)",[]],
+[817,"健","healthy","jiàn","建 hints sound — 健康(healthy)",[]],
+[818,"停","stop/halt","tíng","亭 hints sound — 停止(stop)",[]],
+[819,"倒","fall/pour","dǎo/dào","到 hints sound — 倒下(fall down)",[]],
+[820,"仁","benevolence","rén","",[]],
+[821,"优","excellent","yōu","→忧(yōu) — 优秀(excellent)",[]],
+[822,"伤","wound/sad","shāng","— 伤心(sad)",[]],
+[823,"保","protect","bǎo","→堡(bǎo) — 保护(protect)",[]],
+[824,"堡","fortress","bǎo/pù","保 hints sound",[]],
+[825,"付","pay","fù","→府(fǔ)俯(fǔ) — 支付(pay)",[]],
+[826,"府","mansion/government","fǔ","付 hints sound — 政府(government)",[]],
+[827,"俯","bend down","fǔ","付 hints sound",[]],
+[828,"代","generation/replace","dài","→贷(dài)袋(dài) — 现代(modern)",[]],
+[829,"袋","bag/pocket","dài","代 hints sound — 袋子(bag)",[]],
+[830,"化","transform","huà","→花(huā)货(huò) — 变化(change)",[]],
+[831,"华","splendid/China","huá","→哗(huā)花(huā) — 中华(China)",[]],
+[832,"哗","clamor","huā/huá","华 hints sound",[]],
+[833,"花","flower/spend","huā","化 hints sound — 花钱(spend money)",[]],
+[834,"货","goods","huò","化 hints sound — 货物(goods)",[]],
+[835,"何","what/how","hé","可 hints sound",[]],
+[836,"便","convenient/cheap","biàn/pián","",[]],
+[837,"丈","husband/measure","zhàng","",[]],
+[838,"使","use/make/envoy","shǐ","史 hints sound — 使用(use)",[]],
+[839,"久","long time","jiǔ","— 很久(a long time)",[]],
+[840,"内","inside","nèi","— 内容(content)",[]],
+[841,"呐","shout","nà","",[]],
+[842,"丙","third/C","bǐng","→柄(bǐng)",[]],
+[843,"柄","handle","bǐng","丙 hints sound",[]],
+[844,"肉","meat/flesh","ròu","Semantic radical: body",[]],
+[845,"腐","rotten/tofu","fǔ","府 hints sound — 豆腐(tofu)",[]],
+[846,"从","follow/from","cóng","→纵(zòng)丛(cóng) — 从来(ever)",[]],
+[847,"众","crowd/multitude","zhòng","从 hints sound — 大众(masses)",[]],
+[848,"坐","sit","zuò","→座(zuò)",[]],
+[849,"座","seat/measure word","zuò","坐 hints sound",[]],
+[850,"巫","shaman/witch","wū","",[]],
+[851,"喝","drink","hē","曷 hints sound — 喝水(drink water)",[]],
+[852,"渴","thirsty","kě","曷 hints sound",[]],
+[853,"任","allow/position","rèn","→廷(tíng)庭(tíng) — 任何(any)",[]],
+[854,"廷","court","tíng","任 hints sound",[]],
+[855,"庭","courtyard","tíng","任 hints sound — 家庭(family)",[]],
+[856,"头","head","tóu","→投(tóu) — 头发(hair)",[]],
+[857,"实","real/solid","shí","— 其实(actually)",[]],
+[858,"买","buy","mǎi","→卖(mài) — 购买(purchase)",[]],
+[859,"卖","sell","mài","买 hints sound — 出售(sell)",[]],
+[860,"读","read","dú","卖 hints sound — 阅读(read)",[]],
+[861,"以","use/by means of","yǐ","— 所以(therefore)",[]],
+[862,"似","resemble","sì","以 hints sound",[]],
+[863,"并","and/combine","bìng","— 并且(moreover)",[]],
+[864,"拼","spell/piece together","pīn","并 hints sound — 拼音(pinyin)",[]],
+[865,"吕","(surname)/spine","lǚ","→侣(lǚ)",[]],
+[866,"侣","companion","lǚ","吕 hints sound",[]],
+[867,"荣","glory/flourish","róng","— 光荣(glory)",[]],
+[868,"劳","labor/toil","láo","— 劳动(labor)",[]],
+[869,"营","camp/manage","yíng","— 经营(manage)",[]],
+[870,"善","good/kind","shàn","→膳(shàn) — 善意(goodwill)",[]],
+[871,"年","year","nián","→碾(niǎn) — 新年(New Year)",[]],
+[872,"夜","night","yè","→液(yè) — 夜晚(night)",[]],
+[873,"液","liquid","yè","夜 hints sound",[]],
+[874,"旅","travel","lǚ","— 旅行(travel)",[]],
+[875,"施","implement/apply","shī","也 hints sound",[]],
+[876,"游","swim/travel","yóu","— 游泳(swim)",[]],
+[877,"勿","don't","wù","→物(wù)忽(hū)",[]],
+[878,"忽","suddenly/neglect","hū","勿 hints sound — 忽然(suddenly)",[]],
+[879,"物","thing/matter","wù","勿 hints sound — 动物(animal)",[]],
+[880,"易","easy/change","yì","→赐(cì)场(chǎng) — 容易(easy)",[]],
+[881,"赐","bestow","cì","易 hints sound",[]],
+[882,"尸","corpse","shī","Semantic radical: body position",[]],
+[883,"尼","Buddhist nun","ní","→呢(ne)泥(ní)",[]],
+[884,"呢","(question particle)","ne","尼 hints sound",[]],
+[885,"泥","mud/clay","ní","尼 hints sound",[]],
+[886,"屋","room/house","wū","→握(wò) — 屋子(room)",[]],
+[887,"握","grasp","wò","屋 hints sound — 握手(shake hands)",[]],
+[888,"居","reside/live","jū","→锯(jù)剧(jù)据(jù) — 居住(reside)",[]],
+[889,"锯","saw","jù","居 hints sound",[]],
+[890,"剧","drama/intense","jù","居 hints sound — 电视剧(TV drama)",[]],
+[891,"据","evidence/occupy","jù","居 hints sound — 根据(according to)",[]],
+[892,"层","layer/floor","céng","— 楼层(floor)",[]],
+[893,"局","bureau/game","jú","— 局势(situation)",[]],
+[894,"尺","ruler/foot","chǐ","— 尺子(ruler)",[]],
+[895,"尽","exhaust/all","jìn/jǐn","— 尽管(despite)",[]],
+[896,"户","household/door","hù","→护(hù) — 用户(user)",[]],
+[897,"房","room/house","fáng","方 hints sound — 房间(room)",[]],
+[898,"雇","hire/employ","gù","户 hints sound",[]],
+[899,"护","guard/protect","hù","户 hints sound — 保护(protect)",[]],
+[900,"示","show/indicate","shì","Semantic radical: spirits/show",[]],
+[901,"社","community","shè","示 hints sound — 社会(society)",[]],
+[902,"礼","ceremony/gift","lǐ","示 hints sound — 礼物(gift)",[]],
+[903,"视","look/regard","shì","示 hints sound — 电视(TV)",[]],
+[904,"福","luck/blessing","fú","示 hints sound — 幸福(happiness)",[]],
+[905,"标","mark/label","biāo","— 目标(goal)",[]],
+[906,"禁","forbid/bear","jìn/jīn","— 禁止(prohibit)",[]],
+[907,"襟","lapel","jīn","禁 hints sound",[]],
+[908,"宗","ancestor/school","zōng","→崇(chóng)",[]],
+[909,"崇","worship/high","chóng","宗 hints sound",[]],
+[910,"祭","sacrifice/ceremony","jì","→察(chá)",[]],
+[911,"察","inspect/observe","chá","祭 hints sound — 观察(observe)",[]],
+[912,"擦","wipe","cā","察 hints sound",[]],
+[913,"由","follow/reason","yóu","→油(yóu)宙(zhòu) — 自由(freedom)",[]],
+[914,"抽","pull out/draw","chōu","由 hints sound — 抽烟(smoke)",[]],
+[915,"油","oil","yóu","由 hints sound — 石油(petroleum)",[]],
+[916,"甲","first/armor","jiǎ","→押(yā)",[]],
+[917,"押","mortgage/escort","yā","甲 hints sound",[]],
+[918,"申","state/Shanghai","shēn","→伸(shēn)神(shén)",[]],
+[919,"伸","stretch/extend","shēn","申 hints sound — 伸手(reach out)",[]],
+[920,"神","spirit/god","shén","申 hints sound — 神奇(miraculous)",[]],
+[921,"果","fruit/result","guǒ","→课(kè)颗(kē) — 结果(result)",[]],
+[922,"课","lesson/class","kè","果 hints sound — 上课(attend class)",[]],
+[923,"颗","(measure for small round)","kē","果 hints sound",[]],
+[924,"斤","catty/axe","jīn","→听(tīng)所(suǒ)近(jìn)",[]],
+[925,"听","listen","tīng","斤 hints sound — 听说(hear that)",[]],
+[926,"所","place/that which","suǒ","斤 hints sound — 所以(therefore)",[]],
+[927,"近","near","jìn","斤 hints sound — 附近(nearby)",[]],
+[928,"斩","behead/chop","zhǎn","斤 hints sound",[]],
+[929,"暂","temporary","zàn","斤 hints sound — 暂时(temporary)",[]],
+[930,"渐","gradually","jiàn","斤 hints sound — 逐渐(gradually)",[]],
+[931,"断","break/stop","duàn","— 判断(judge)",[]],
+[932,"折","fold/break","zhé/shé","→哲(zhé)",[]],
+[933,"哲","wise/philosophy","zhé","折 hints sound",[]],
+[934,"逝","pass away","shì","折 hints sound",[]],
+[935,"斥","scold/repel","chì","→诉(sù)",[]],
+[936,"诉","tell/complain","sù","斥 hints sound — 告诉(tell)",[]],
+[937,"乍","suddenly","zhà","→作(zuò)怎(zěn)昨(zuó)",[]],
+[938,"怎","how/why","zěn","乍 hints sound — 怎么(how)",[]],
+[939,"昨","yesterday","zuó","乍 hints sound — 昨天(yesterday)",[]],
+[940,"作","do/make","zuò","乍 hints sound — 工作(work)",[]],
+[941,"雪","snow","xuě","— 下雪(snow)",[]],
+[942,"灵","spirit/clever","líng","— 灵活(flexible)",[]],
+[943,"妇","woman/wife","fù","— 妇女(women)",[]],
+[944,"扫","sweep","sǎo","妇 hints sound — 打扫(sweep)",[]],
+[945,"寻","search","xún","— 寻找(search)",[]],
+[946,"急","urgent/anxious","jí","及 hints sound — 紧急(urgent)",[]],
+[947,"当","should/serve as","dāng/dàng","→档(dàng) — 当然(of course)",[]],
+[948,"档","file/grade","dàng","当 hints sound",[]],
+[949,"录","record","lù","→碌(lù) — 记录(record)",[]],
+[950,"碌","mediocre/busy","lù","录 hints sound",[]],
+[951,"争","contend/strive","zhēng","→净(jìng) — 竞争(compete)",[]],
+[952,"净","clean/pure","jìng","争 hints sound — 干净(clean)",[]],
+[953,"事","matter/affair","shì","— 故事(story)",[]],
+[954,"唐","Tang dynasty","táng","→糖(táng)",[]],
+[955,"糖","sugar/candy","táng","唐 hints sound — 糖果(candy)",[]],
+[956,"康","healthy/well-off","kāng","— 健康(healthy)",[]],
+[957,"尹","official","yǐn","→伊(yī)君(jūn)",[]],
+[958,"伊","he/she (literary)","yī","尹 hints sound",[]],
+[959,"君","monarch/gentleman","jūn","尹 hints sound — 君子(gentleman)",[]],
+[960,"裙","skirt","qún","君 hints sound — 裙子(skirt)",[]],
+[961,"群","group","qún","君 hints sound — 群体(group)",[]],
+[962,"而","and/but","ér","→需(xū)儒(rú)",[]],
+[963,"需","need","xū","而 hints sound — 需要(need)",[]],
+[964,"儒","Confucian scholar","rú","而 hints sound",[]],
+[965,"瑞","auspicious","ruì","",[]],
+[966,"端","end/upright","duān","— 端正(upright)",[]],
+[967,"曲","song/bent","qǔ/qū","",[]],
+[968,"斗","fight/dipper","dòu/dǒu","→料(liào)",[]],
+[969,"料","material/expect","liào","斗 hints sound — 材料(material)",[]],
+[970,"科","subject/department","kē","禾 hints sound — 科学(science)",[]],
+[971,"用","use","yòng","→甬(yǒng)通(tōng) — 使用(use)",[]],
+[972,"确","certain/accurate","què","— 确定(determine)",[]],
+[973,"昔","formerly","xī","→借(jiè)错(cuò)",[]],
+[974,"借","borrow/lend","jiè","昔 hints sound — 借钱(borrow money)",[]],
+[975,"错","wrong/mistaken","cuò","昔 hints sound — 错误(mistake)",[]],
+[976,"散","scatter/loose","sàn/sǎn","→撒(sā) — 散步(walk)",[]],
+[977,"撒","let go/scatter","sā/sǎ","散 hints sound",[]],
+[978,"廿","twenty","niàn","",[]],
+[979,"席","seat/mat","xí","",[]],
+[980,"度","degree/measure","dù","→渡(dù)镀(dù) — 程度(degree)",[]],
+[981,"渡","cross (water)","dù","度 hints sound",[]],
+[982,"半","half","bàn","→伴(bàn)胖(pàng)判(pàn)",[]],
+[983,"伴","companion","bàn","半 hints sound — 伙伴(partner)",[]],
+[984,"胖","fat/plump","pàng","半 hints sound",[]],
+[985,"判","judge","pàn","半 hints sound — 判断(judge)",[]],
+[986,"眷","dependent/care for","juàn","",[]],
+[987,"拳","fist","quán","眷 hints sound",[]],
+[988,"片","slice/film","piàn","→版(bǎn) — 照片(photo)",[]],
+[989,"版","edition/plank","bǎn","片 hints sound — 出版(publish)",[]],
+[990,"之","(classical possessive)","zhī","→乏(fá)",[]],
+[991,"乏","tired/lacking","fá","之 hints sound",[]],
+[992,"眨","blink","zhǎ","乏 hints sound",[]],
+[993,"不","no/not","bù","→杯(bēi)否(fǒu) — 不是(is not)",[]],
+[994,"否","no/negate","fǒu/pǐ","不 hints sound",[]],
+[995,"坏","bad/broken","huài","不 hints sound",[]],
+[996,"环","surround/ring","huán","不 hints sound — 环境(environment)",[]],
+[997,"杯","cup","bēi","不 hints sound — 杯子(cup)",[]],
+[998,"还","still/return","hái/huán","不 hints sound — 还是(or/still)",[]],
+[999,"怀","bosom/cherish","huái","不 hints sound — 怀念(miss)",[]],
+[1000,"矢","arrow","shǐ","→族(zú)知(zhī)",[]],
+[1001,"族","ethnic group/clan","zú","矢 hints sound — 民族(ethnic group)",[]],
+[1002,"知","know","zhī","矢 hints sound — 知道(know)",[]],
+[1003,"智","wisdom","zhì","知 hints sound — 智慧(wisdom)",[]],
+[1004,"矛","spear","máo","→柔(róu)揉(róu)",[]],
+[1005,"柔","soft/gentle","róu","矛 hints sound — 温柔(gentle)",[]],
+[1006,"揉","knead/rub","róu","矛 hints sound",[]],
+[1007,"予","give/I (classical)","yǔ","→序(xù)预(yù)",[]],
+[1008,"序","order/preface","xù","予 hints sound — 顺序(order)",[]],
+[1009,"预","in advance","yù","予 hints sound — 预备(prepare)",[]],
+[1010,"野","wild/field","yě","予 hints sound — 野外(outdoors)",[]],
+[1011,"班","class/work shift","bān","— 班级(class)",[]],
+[1012,"临","face/near","lín","— 面临(face)",[]],
+[1013,"坚","firm","jiān","→贤(xián) — 坚持(persist)",[]],
+[1014,"贤","virtuous/wise","xián","坚 hints sound",[]],
+[1015,"弓","bow (weapon)","gōng","→引(yǐn)弥(mí)强(qiáng)弱(ruò)弹(dàn)",[]],
+[1016,"引","lead/stretch","yǐn","弓 hints sound — 吸引(attract)",[]],
+[1017,"弥","fill/more","mí","弓 hints sound",[]],
+[1018,"强","strong/force","qiáng/qiǎng","弓 hints sound — 强调(emphasize)",[]],
+[1019,"弱","weak","ruò","弓 hints sound — 软弱(weak)",[]],
+[1020,"单","single/list","dān","弓 hints sound — 简单(simple)",[]],
+[1021,"弹","bullet/play","dán/tán","弓 hints sound — 弹钢琴(play piano)",[]],
+[1022,"费","fee/spend","fèi","弓 hints sound — 费用(cost)",[]],
+[1023,"佛","Buddha","fó/fú","弗 hints sound",[]],
+[1024,"弟","younger brother","dì","弓 hints sound — 弟弟(younger brother)",[]],
+[1025,"第","(ordinal prefix)","dì","弓 hints sound — 第一(first)",[]],
+[1026,"巧","skillful/clever","qiǎo","",[]],
+[1027,"号","number/cry","hào/háo","巧 hints sound — 号码(number)",[]],
+[1028,"身","body/oneself","shēn","→射(shè)谢(xiè)",[]],
+[1029,"射","shoot/inject","shè","身 hints sound",[]],
+[1030,"谢","thank","xiè","身 hints sound — 谢谢(thank you)",[]],
+[1031,"老","old","lǎo","→考(kǎo) — 老师(teacher)",[]],
+[1032,"考","test/examine","kǎo","老 hints sound — 考试(exam)",[]],
+[1033,"烤","roast/bake","kǎo","老 hints sound",[]],
+[1034,"与","and/with","yǔ","→写(xiě)泻(xiè)",[]],
+[1035,"写","write","xiě","与 hints sound — 写字(write)",[]],
+[1036,"泻","drain/diarrhea","xiè","与 hints sound",[]],
+[1037,"孝","filial piety","xiào","→教(jiāo)",[]],
+[1038,"教","teach","jiāo/jiào","孝 hints sound — 教育(education)",[]],
+[1039,"者","one who/person","zhě","→著(zhù)猪(zhū) — 作者(author)",[]],
+[1040,"著","write/notable","zhù/zhuó","者 hints sound — 著名(famous)",[]],
+[1041,"猪","pig","zhū","者 hints sound",[]],
+[1042,"追","chase/pursue","zhuī","— 追求(pursue)",[]],
+[1043,"官","official","guān","→管(guǎn) — 官员(official)",[]],
+[1044,"管","tube/control","guǎn","官 hints sound — 管理(manage)",[]],
+[1045,"父","father","fù","→釜(fǔ)斧(fǔ)",[]],
+[1046,"交","intersect/hand over","jiāo","→效(xiào)较(jiào)校(xiào) — 交流(communicate)",[]],
+[1047,"效","effect/imitate","xiào","交 hints sound — 效果(effect)",[]],
+[1048,"较","compare/relatively","jiào","交 hints sound — 比较(compare)",[]],
+[1049,"校","school/check","xiào/jiào","交 hints sound — 学校(school)",[]],
+[1050,"足","foot/enough","zú","→促(cù)族(zú) — 满足(satisfy)",[]],
+[1051,"跑","run","pǎo","包 hints sound — 跑步(run)",[]],
+[1052,"跳","jump","tiào","兆 hints sound — 跳舞(dance)",[]],
+[1053,"路","road","lù","各 hints sound — 路上(on the way)",[]],
+[1054,"露","dew/reveal","lù/lòu","路 hints sound — 露出(reveal)",[]],
+[1055,"骨","bone","gǔ","→滑(huá)",[]],
+[1056,"滑","slip/smooth","huá","骨 hints sound",[]],
+[1057,"阿","(prefix/exclamation)","ā/ē","",[]],
+[1058,"啊","(exclamation)","a","",[]],
+[1059,"随","follow/casual","suí","— 随便(casual)",[]],
+[1060,"阳","sun/positive","yáng","— 太阳(sun)",[]],
+[1061,"阴","shade/negative","yīn","— 阴天(cloudy day)",[]],
+[1062,"荫","shade/shelter","yīn/yìn","阴 hints sound",[]],
+[1063,"防","prevent/defend","fáng","方 hints sound — 预防(prevent)",[]],
+[1064,"附","attach/near","fù","— 附近(nearby)",[]],
+[1065,"际","border/occasion","jì","— 国际(international)",[]],
+[1066,"阶","step/rank","jiē","介 hints sound — 阶段(stage)",[]],
+[1067,"院","courtyard/institution","yuàn","完 hints sound — 医院(hospital)",[]],
+[1068,"阵","battle formation","zhèn","",[]],
+[1069,"队","team/group","duì","— 队伍(troops)",[]],
+[1070,"坠","fall/pendant","zhuì","队 hints sound",[]],
+[1071,"降","descend/surrender","jiàng/xiáng","— 下降(decline)",[]],
+[1072,"穴","cave/acupuncture point","xué","→究(jiū)突(tū)空(kōng)",[]],
+[1073,"究","study deeply","jiū","穴 hints sound — 研究(research)",[]],
+[1074,"突","sudden/protrude","tū","穴 hints sound — 突然(suddenly)",[]],
+[1075,"空","sky/empty","kōng","穴 hints sound — 空间(space)",[]],
+[1076,"控","control","kòng","空 hints sound — 控制(control)",[]],
+[1077,"深","deep","shēn","— 深度(depth)",[]],
+[1078,"探","explore/visit","tàn","深 hints sound — 探索(explore)",[]],
+[1079,"丘","hill/mound","qiū","→兵(bīng)",[]],
+[1080,"兵","soldier/weapon","bīng","丘 hints sound — 士兵(soldier)",[]],
+[1081,"丝","silk/thread","sī","→织(zhī)线(xiàn)",[]],
+[1082,"织","weave","zhī","丝 hints sound — 组织(organize)",[]],
+[1083,"线","line/thread","xiàn","丝 hints sound — 线索(clue)",[]],
+[1084,"维","maintain/fiber","wéi","隹 hints sound — 维护(maintain)",[]],
+[1085,"统","unite/all","tǒng","充 hints sound — 系统(system)",[]],
+[1086,"给","give/for","gěi/jǐ","合 hints sound — 给予(give)",[]],
+[1087,"结","tie/result","jié","吉 hints sound — 结果(result)",[]],
+[1088,"终","end","zhōng","冬 hints sound — 最终(ultimately)",[]],
+[1089,"级","grade/level","jí","— 级别(level)",[]],
+[1090,"纪","record/century","jì","己 hints sound — 世纪(century)",[]],
+[1091,"红","red","hóng","工 hints sound — 红色(red)",[]],
+[1092,"约","approximately/invite","yuē","勺 hints sound — 大约(approximately)",[]],
+[1093,"细","fine/detailed","xì","— 仔细(careful)",[]],
+[1094,"纵","vertical/indulge","zòng","从 hints sound",[]],
+[1095,"绿","green","lǜ","录 hints sound — 绿色(green)",[]],
+[1096,"经","pass through/classic","jīng","→经常(often)经过(pass through)",[]],
+[1097,"轻","light/gentle","qīng","— 轻松(relaxed)",[]],
+[1098,"续","connect/continue","xù","卖 hints sound — 继续(continue)",[]],
+[1099,"继","follow/continue","jì","→继续(continue)",[]],
+[1100,"药","medicine","yào","乐 hints sound — 吃药(take medicine)",[]],
+[1101,"系","tie/system","xì","→紧(jǐn) — 关系(relationship)",[]],
+[1102,"紧","tight/urgent","jǐn","系 hints sound — 紧张(nervous)",[]],
+[1103,"却","but/retreat","què","去 hints sound — 但却(but yet)",[]],
+[1104,"脚","foot","jiǎo","— 脚步(footstep)",[]],
+[1105,"服","serve/clothing","fú","月 hints sound — 服务(service)",[]],
+[1106,"报","report/newspaper","bào","— 报告(report)",[]],
+[1107,"命","life/fate","mìng","令 hints sound — 生命(life)",[]],
+[1108,"贸","trade","mào","— 贸易(trade)",[]],
+[1109,"留","stay/keep","liú","→溜(liū)聊(liáo)柳(liǔ) — 留下(stay)",[]],
+[1110,"溜","slide/sneak","liū","留 hints sound",[]],
+[1111,"聊","chat","liáo","留 hints sound — 聊天(chat)",[]],
+[1112,"柳","willow","liǔ","留 hints sound",[]],
+[1113,"节","festival/joint","jié","— 节日(festival)",[]],
+[1114,"卫","guard/defend","wèi","— 保卫(defend)",[]],
+[1115,"令","order/make","lìng","→冷(lěng)零(líng)领(lǐng)命(mìng)",[]],
+[1116,"冷","cold","lěng","令 hints sound — 冷静(calm)",[]],
+[1117,"零","zero/scattered","líng","令 hints sound — 零件(spare part)",[]],
+[1118,"领","lead/collar","lǐng","令 hints sound — 领导(lead)",[]],
+[1119,"通","pass through/connect","tōng","甬 hints sound — 通过(through)",[]],
+[1120,"勇","brave","yǒng","甬 hints sound — 勇气(courage)",[]],
+[1121,"仓","warehouse","cāng","→枪(qiāng)创(chuàng)",[]],
+[1122,"枪","gun/spear","qiāng","仓 hints sound",[]],
+[1123,"创","create/wound","chuàng/chuāng","仓 hints sound — 创造(create)",[]],
+[1124,"犯","commit/criminal","fàn","— 犯罪(commit crime)",[]],
+[1125,"危","danger","wēi","— 危险(dangerous)",[]],
+[1126,"脆","crispy/fragile","cuì","",[]],
+[1127,"印","print/seal","yìn","— 印象(impression)",[]],
+[1128,"酒","alcohol/wine","jiǔ","— 喝酒(drink alcohol)",[]],
+[1129,"配","match/distribute","pèi","— 配合(coordinate)",[]],
+[1130,"酋","chieftain","qiú","→尊(zūn)",[]],
+[1131,"尊","respect","zūn","酋 hints sound — 尊重(respect)",[]],
+[1132,"遵","follow/obey","zūn","尊 hints sound — 遵守(abide by)",[]],
+[1133,"豆","bean","dòu","→短(duǎn)厨(chú) — 豆腐(tofu)",[]],
+[1134,"短","short","duǎn","豆 hints sound — 短暂(brief)",[]],
+[1135,"厨","kitchen","chú","豆 hints sound — 厨房(kitchen)",[]],
+[1136,"鼓","drum/encourage","gǔ","",[]],
+[1137,"喜","happy","xǐ","— 喜欢(like)",[]],
+[1138,"血","blood","xuè/xiě","",[]],
+[1139,"盖","cover/lid","gài","",[]],
+[1140,"温","warm","wēn","— 温度(temperature)",[]],
+[1141,"监","watch over/prison","jiān","→篮(lán)蓝(lán) — 监督(supervise)",[]],
+[1142,"篮","basket","lán","监 hints sound — 篮球(basketball)",[]],
+[1143,"蓝","blue","lán","监 hints sound — 蓝色(blue)",[]],
+[1144,"银","silver/bank","yín","— 银行(bank)",[]],
+[1145,"跟","follow/with","gēn","艮 hints sound — 跟着(follow)",[]],
+[1146,"很","very","hěn","艮 hints sound — 很多(many)",[]],
+[1147,"根","root","gēn","艮 hints sound — 根据(according to)",[]],
+[1148,"即","immediate/namely","jí","— 即使(even if)",[]],
+[1149,"退","retreat/return","tuì","— 退出(withdraw)",[]],
+[1150,"腿","leg","tuǐ","退 hints sound",[]],
+[1151,"限","limit","xiàn","艮 hints sound — 限制(limit)",[]],
+[1152,"眼","eye","yǎn","艮 hints sound — 眼睛(eye)",[]],
+[1153,"良","good/fine","liáng","→浪(làng)娘(niáng)",[]],
+[1154,"浪","wave/waste","làng","良 hints sound — 浪费(waste)",[]],
+[1155,"娘","mother/girl","niáng","良 hints sound — 姑娘(girl)",[]],
+[1156,"食","eat/food","shí","Semantic radical: food — 食物(food)",[]],
+[1157,"饭","cooked rice/meal","fàn","反 hints sound — 吃饭(eat)",[]],
+[1158,"餐","meal","cān","— 餐厅(restaurant)",[]],
+[1159,"馆","hall/restaurant","guǎn","官 hints sound — 博物馆(museum)",[]],
+[1160,"既","already/both","jì","→概(gài) — 既然(since)",[]],
+[1161,"概","general/roughly","gài","既 hints sound — 大概(probably)",[]],
+[1162,"平","flat/level","píng","→评(píng)坪(píng) — 和平(peace)",[]],
+[1163,"评","evaluate/comment","píng","平 hints sound — 评论(comment)",[]],
+[1164,"坪","flat ground","píng","平 hints sound",[]],
+[1165,"乎","(classical particle)","hū","→呼(hū)",[]],
+[1166,"呼","call out/breathe","hū","乎 hints sound — 呼吸(breathe)",[]],
+[1167,"希","rare/hope","xī","→稀(xī) — 希望(hope)",[]],
+[1168,"稀","rare/sparse","xī","希 hints sound",[]],
+[1169,"杀","kill","shā","",[]],
+[1170,"风","wind","fēng","→讽(fěng)疯(fēng) — 台风(typhoon)",[]],
+[1171,"讽","satirize","fěng","风 hints sound",[]],
+[1172,"冈","ridge","gāng","→刚(gāng)网(wǎng)",[]],
+[1173,"刚","just/firm","gāng","冈 hints sound — 刚才(just now)",[]],
+[1174,"网","net/internet","wǎng","冈 hints sound — 网络(internet)",[]],
+[1175,"画","draw/painting","huà","— 画画(draw/paint)",[]],
+[1176,"凶","fierce/ominous","xiōng","→胸(xiōng)",[]],
+[1177,"胸","chest","xiōng","凶 hints sound",[]],
+[1178,"脑","brain","nǎo","凶 hints sound — 电脑(computer)",[]],
+[1179,"恼","annoyed","nǎo","凶 hints sound",[]],
+[1180,"离","leave/away from","lí","— 离开(leave)",[]],
+[1181,"禽","bird/fowl","qín","",[]],
+[1182,"义","righteousness","yì","→仪(yí)蚁(yǐ) — 意义(meaning)",[]],
+[1183,"仪","ceremony/appearance","yí","义 hints sound",[]],
+[1184,"蚁","ant","yǐ","义 hints sound",[]],
+[1185,"辛","hard/pungent","xīn","→辩(biàn)辟(pì)",[]],
+[1186,"辩","argue/distinguish","biàn","辛 hints sound — 辩论(debate)",[]],
+[1187,"辟","open up/monarch","pì/bì","辛 hints sound",[]],
+[1188,"壁","wall","bì","辛 hints sound — 墙壁(wall)",[]],
+[1189,"避","avoid","bì","辛 hints sound — 避免(avoid)",[]],
+[1190,"亲","close/relative","qīn","→新(xīn)薪(xīn) — 亲爱(dear)",[]],
+[1191,"新","new","xīn","亲 hints sound — 新年(New Year)",[]],
+[1192,"薪","salary/firewood","xīn","亲 hints sound",[]],
+[1193,"幸","lucky","xìng","— 幸福(happiness)",[]],
+[1194,"叫","shout/be called","jiào","— 叫做(be called)",[]],
+[1195,"收","receive/collect","shōu","— 收到(receive)",[]],
+[1196,"亥","(12th earthly branch)","hài","→核(hé)孩(hái)刻(kè)该(gāi)",[]],
+[1197,"核","core/nucleus","hé","亥 hints sound — 核心(core)",[]],
+[1198,"孩","child","hái","亥 hints sound — 孩子(child)",[]],
+[1199,"刻","carve/quarter hour","kè","亥 hints sound — 立刻(immediately)",[]],
+[1200,"该","ought to","gāi","亥 hints sound — 应该(should)",[]],
+[1201,"术","technique/art","shù","→述(shù) — 技术(technology)",[]],
+[1202,"述","narrate/state","shù","术 hints sound — 陈述(state)",[]],
+[1203,"襄","assist","xiāng","→壤(rǎng)",[]],
+[1204,"壤","soil","rǎng","襄 hints sound",[]],
+[1205,"寒","cold","hán","— 寒冷(cold)",[]],
+[1206,"赛","compete/race","sài","— 比赛(competition)",[]],
+[1207,"毒","poison","dú","",[]],
+[1208,"麦","wheat","mài","",[]],
+[1209,"素","basic/vegetarian","sù","— 素食(vegetarian)",[]],
+[1210,"青","blue-green/young","qīng","→精(jīng)请(qǐng)情(qíng)睛(jīng)清(qīng)静(jìng)",[]],
+[1211,"精","essence/refined","jīng","青 hints sound — 精神(spirit)",[]],
+[1212,"请","please/invite","qǐng","青 hints sound — 请问(excuse me)",[]],
+[1213,"情","emotion/feeling","qíng","青 hints sound — 感情(feelings)",[]],
+[1214,"睛","eyeball","jīng","青 hints sound — 眼睛(eye)",[]],
+[1215,"清","clear/pure","qīng","青 hints sound — 清楚(clear)",[]],
+[1216,"静","quiet","jìng","青 hints sound — 安静(quiet)",[]],
+[1217,"责","duty/blame","zé","→绩(jī) — 责任(responsibility)",[]],
+[1218,"绩","results","jī","责 hints sound — 成绩(grades)",[]],
+[1219,"表","surface/express","biǎo","→婊(biǎo) — 表示(express)",[]],
+[1220,"生","life/born","shēng","→性(xìng)姓(xìng)星(xīng) — 生活(life)",[]],
+[1221,"星","star","xīng","生 hints sound — 明星(celebrity)",[]],
+[1222,"姓","surname","xìng","生 hints sound — 姓名(full name)",[]],
+[1223,"性","nature/sex","xìng","生 hints sound — 性格(character)",[]],
+[1224,"胜","win/surpass","shèng","生 hints sound — 胜利(victory)",[]],
+[1225,"丰","abundant","fēng","",[]],
+[1226,"害","harm","hài","— 害怕(afraid)",[]],
+[1227,"割","cut/harvest","gē","害 hints sound",[]],
+[1228,"慧","wisdom","huì","— 聪慧(intelligent)",[]],
+[1229,"韦","tanned leather","wéi","→围(wéi)伟(wěi)",[]],
+[1230,"围","surround","wéi","韦 hints sound — 围绕(surround)",[]],
+[1231,"伟","great/mighty","wěi","韦 hints sound — 伟大(great)",[]],
+[1232,"春","spring (season)","chūn","— 春天(spring)",[]],
+[1233,"泰","peaceful/extreme","tài","太 hints sound — 泰国(Thailand)",[]],
+[1234,"奉","offer/serve","fèng","→棒(bàng)",[]],
+[1235,"棒","stick/great","bàng","奉 hints sound — 很棒(great)",[]],
+[1236,"击","hit/attack","jī","",[]],
+[1237,"陆","land/continent","lù","— 大陆(mainland)",[]],
+[1238,"专","special","zhuān","→传(chuán)转(zhuǎn) — 专业(specialty)",[]],
+[1239,"传","pass on","chuán/zhuàn","专 hints sound — 传统(tradition)",[]],
+[1240,"转","turn/transfer","zhuǎn","专 hints sound — 转变(transform)",[]],
+[1241,"勤","diligent","qín","— 勤奋(diligent)",[]],
+[1242,"谨","careful","jǐn","— 谨慎(careful)",[]],
+[1243,"垂","hang down","chuí","→锤(chuí)睡(shuì)",[]],
+[1244,"锤","hammer","chuí","垂 hints sound",[]],
+[1245,"睡","sleep","shuì","垂 hints sound — 睡觉(sleep)",[]],
+[1246,"今","now/today","jīn","→念(niàn)琴(qín)含(hán) — 今天(today)",[]],
+[1247,"含","contain/hold in mouth","hán","今 hints sound",[]],
+[1248,"念","read aloud/miss","niàn","今 hints sound — 想念(miss)",[]],
+[1249,"东","east","dōng","→栋(dòng)冻(dòng) — 东西(thing)",[]],
+[1250,"栋","(measure for buildings)","dòng","东 hints sound",[]],
+[1251,"冻","freeze","dòng","东 hints sound — 冻结(freeze)",[]],
+[1252,"陈","display/Chen","chén","",[]],
+[1253,"练","practice/refine","liàn","东 hints sound — 练习(practice)",[]],
+[1254,"拣","pick/choose","jiǎn","",[]],
+[1255,"西","west","xī","→栖(qī)洒(sǎ) — 西方(west)",[]],
+[1256,"要","want/need","yào/yāo","西 hints sound — 需要(need)",[]],
+[1257,"腰","waist","yāo","西 hints sound",[]],
+[1258,"票","ticket/vote","piào","西 hints sound — 车票(ticket)",[]],
+[1259,"漂","float/pretty","piāo/piào","西 hints sound — 漂亮(pretty)",[]],
+[1260,"贾","merchant/surname","jiǎ/gǔ","西 hints sound",[]],
+[1261,"南","south","nán","— 南方(south)",[]],
+[1262,"门","gate/door","mén","Semantic radical: entrance — 门口(entrance)",[]],
+[1263,"们","(plural suffix)","men","— 我们(we)",[]],
+[1264,"闲","leisure/idle","xián","门 hints sound — 空闲(free time)",[]],
+[1265,"问","ask","wèn","门 hints sound — 问题(problem)",[]],
+[1266,"间","between/room","jiān/jiàn","门 hints sound — 时间(time)",[]],
+[1267,"简","simple","jiǎn","门 hints sound — 简单(simple)",[]],
+[1268,"闻","hear/smell","wén","门 hints sound — 新闻(news)",[]],
+[1269,"非","not/wrong","fēi","→排(pái)罪(zuì)靠(kào) — 非常(very)",[]],
+[1270,"排","arrange/row","pái","非 hints sound — 排列(arrange)",[]],
+[1271,"罪","crime/sin","zuì","非 hints sound — 犯罪(crime)",[]],
+[1272,"靠","lean/rely","kào","非 hints sound — 依靠(rely on)",[]],
+[1273,"侯","marquis","hóu","→候(hòu)",[]],
+[1274,"候","wait/time","hòu","侯 hints sound — 等候(wait)",[]],
+[1275,"决","decide","jué","→诀(jué)缺(quē) — 决定(decide)",[]],
+[1276,"快","fast/happy","kuài","决 hints sound — 快乐(happy)",[]],
+[1277,"块","piece/chunk","kuài","决 hints sound",[]],
+[1278,"筷","chopsticks","kuài","决 hints sound — 筷子(chopsticks)",[]],
+[1279,"干","dry/do","gān/gàn","→岸(àn)旱(hàn)赶(gǎn) — 干净(clean)",[]],
+[1280,"岸","shore/bank","àn","干 hints sound",[]],
+[1281,"旱","drought","hàn","干 hints sound",[]],
+[1282,"赶","catch up/hurry","gǎn","干 hints sound",[]],
+[1283,"于","at/in/to","yú","→污(wū) — 由于(due to)",[]],
+[1284,"宇","space/universe","yǔ","于 hints sound",[]],
+[1285,"余","surplus/I","yú","于 hints sound — 多余(excess)",[]],
+[1286,"除","remove/divide","chú","于 hints sound — 除了(except)",[]],
+[1287,"途","road/途中","tú","余 hints sound — 途中(on the way)",[]],
+[1288,"束","bind/bundle","shù","→速(sù) — 结束(end)",[]],
+[1289,"速","speed","sù","束 hints sound — 速度(speed)",[]],
+[1290,"辣","spicy","là","",[]],
+[1291,"整","arrange/complete","zhěng","— 整理(organize)",[]],
+[1292,"重","heavy/again","zhòng/chóng","→动(dòng)种(zhǒng) — 重要(important)",[]],
+[1293,"懂","understand","dǒng","— 听懂(understand)",[]],
+[1294,"病","sick","bìng","→痛(tòng)疯(fēng) — 生病(get sick)",[]],
+[1295,"痛","pain/ache","tòng","病 hints sound — 头痛(headache)",[]],
+[1296,"疯","crazy","fēng","病 hints sound — 疯狂(crazy)",[]],
+[1297,"区","area/district","qū","→枢(shū)欧(ōu) — 地区(area)",[]],
+[1298,"枢","pivot/hub","shū","区 hints sound",[]],
+[1299,"欧","Europe","ōu","区 hints sound — 欧洲(Europe)",[]],
+[1300,"医","heal/doctor","yī","— 医院(hospital)医生(doctor)",[]],
+[1301,"仰","look up/admire","yǎng","",[]],
+[1302,"迎","welcome/greet","yíng","— 欢迎(welcome)",[]],
+[1303,"登","climb/publish","dēng","— 登上(climb up)",[]],
+[1304,"发","send/hair","fā/fà","→废(fèi) — 发展(develop)",[]],
+[1305,"废","abandon/waste","fèi","发 hints sound — 废弃(abandon)",[]],
+[1306,"形","shape/form","xíng","→型(xíng) — 形状(shape)",[]],
+[1307,"影","shadow/film","yǐng","京 hints sound — 电影(movie)",[]],
+[1308,"彩","color/colorful","cǎi","— 精彩(wonderful)",[]],
+[1309,"须","must/beard","xū","→参(cān)",[]],
+[1310,"参","join/ginseng","cān/shēn","须 hints sound — 参加(participate)",[]],
+[1311,"惨","miserable","cǎn","参 hints sound",[]],
+[1312,"修","repair/cultivate","xiū","— 修改(revise)",[]],
+[1313,"珍","precious","zhēn","— 珍贵(precious)",[]],
+[1314,"产","produce","chǎn","— 产品(product)",[]],
+[1315,"彦","talented person","yàn","→颜(yán)",[]],
+[1316,"颜","face/color","yán","彦 hints sound — 颜色(color)",[]],
+[1317,"文","writing/culture","wén","→纹(wén)蚊(wén)闻(wén) — 文化(culture)",[]],
+[1318,"蚊","mosquito","wén","文 hints sound",[]],
+[1319,"这","this","zhè","— 这里(here)",[]],
+[1320,"齐","neat/together","qí","→济(jì)",[]],
+[1321,"济","assist/cross","jì","齐 hints sound — 经济(economy)",[]],
+[1322,"率","rate/lead","lǜ/shuài","→摔(shuāi)",[]],
+[1323,"摔","fall/throw down","shuāi","率 hints sound",[]],
+[1324,"央","center/request","yāng","→英(yīng)唤(huàn)换(huàn)",[]],
+[1325,"英","hero/England","yīng","央 hints sound — 英语(English)",[]],
+[1326,"唤","call out","huàn","央 hints sound",[]],
+[1327,"换","exchange","huàn","央 hints sound — 交换(exchange)",[]],
+[1328,"巴","hope/base","bā","→把(bǎ)爸(bà)吧(ba)",[]],
+[1329,"把","handle/grasp","bǎ","巴 hints sound — 把握(grasp)",[]],
+[1330,"爸","dad","bà","巴 hints sound — 爸爸(dad)",[]],
+[1331,"吧","(particle/bar)","ba","巴 hints sound — 好吧(okay)",[]],
+[1332,"色","color","sè/shǎi","→绝(jué)艳(yàn) — 颜色(color)",[]],
+[1333,"绝","cut off/absolute","jué","色 hints sound — 绝对(absolute)",[]],
+[1334,"艳","gorgeous","yàn","色 hints sound",[]],
+[1335,"甘","sweet/willing","gān","→某(mǒu)其(qí)",[]],
+[1336,"某","certain/some","mǒu","甘 hints sound — 某些(certain)",[]],
+[1337,"其","its/their","qí","甘 hints sound — 其他(other)",[]],
+[1338,"期","period/expect","qī","其 hints sound — 时期(period)",[]],
+[1339,"基","base/foundation","jī","其 hints sound — 基础(foundation)",[]],
+[1340,"甚","very/exceed","shèn","→斯(sī)",[]],
+[1341,"斯","(classical particle)","sī","甚 hints sound",[]],
+[1342,"贵","expensive/honorable","guì","— 珍贵(precious)",[]],
+[1343,"遗","leave behind/lose","yí","— 遗忘(forget)",[]],
+[1344,"舞","dance","wǔ","午 hints sound — 跳舞(dance)",[]],
+[1345,"且","moreover","qiě","→姐(jiě)组(zǔ)祖(zǔ)助(zhù)",[]],
+[1346,"姐","elder sister","jiě","且 hints sound — 姐姐(elder sister)",[]],
+[1347,"组","group/organize","zǔ","且 hints sound — 组织(organize)",[]],
+[1348,"祖","ancestor","zǔ","且 hints sound — 祖先(ancestor)",[]],
+[1349,"助","assist","zhù","且 hints sound — 帮助(help)",[]],
+[1350,"普","widespread","pǔ","— 普通话(Mandarin)",[]],
+[1351,"业","industry/profession","yè","— 职业(profession)",[]],
+[1352,"显","obvious/display","xiǎn","— 明显(obvious)",[]],
+[1353,"亚","Asia/second","yà","→恶(è) — 亚洲(Asia)",[]],
+[1354,"恶","evil/hate","è/wù","亚 hints sound",[]],
+[1355,"严","strict/severe","yán","— 严格(strict)",[]],
+[1356,"共","together/total","gòng","→供(gōng)巷(xiàng)港(gǎng) — 共同(together)",[]],
+[1357,"供","supply/offer","gōng/gòng","共 hints sound — 提供(provide)",[]],
+[1358,"巷","alley","xiàng","共 hints sound",[]],
+[1359,"港","harbor/Hong Kong","gǎng","共 hints sound — 香港(Hong Kong)",[]],
+[1360,"井","well","jǐng","→讲(jiǎng)进(jìn)",[]],
+[1361,"讲","speak/explain","jiǎng","井 hints sound — 讲解(explain)",[]],
+[1362,"进","advance/enter","jìn","井 hints sound — 进入(enter)",[]],
+[1363,"角","angle/horn","jiǎo/jué","→解(jiě) — 角度(angle)",[]],
+[1364,"解","untangle/explain","jiě","角 hints sound — 理解(understand)",[]],
+[1365,"嘴","mouth/beak","zuǐ","",[]],
+[1366,"再","again","zài","— 再见(goodbye)",[]],
+[1367,"扁","flat","biǎn","→篇(piān)编(biān)",[]],
+[1368,"篇","piece of writing","piān","扁 hints sound",[]],
+[1369,"编","compile/braid","biān","扁 hints sound — 编写(compile)",[]],
+[1370,"典","classic/ceremony","diǎn","— 字典(dictionary)",[]],
+[1371,"氏","clan/family name","shì","→纸(zhǐ)昏(hūn)婚(hūn)",[]],
+[1372,"纸","paper","zhǐ","氏 hints sound — 纸张(paper)",[]],
+[1373,"昏","dusk/confused","hūn","氏 hints sound — 昏暗(dim)",[]],
+[1374,"婚","marriage","hūn","氏 hints sound — 结婚(marry)",[]],
+[1375,"低","low","dī","→底(dǐ) — 低下(low)",[]],
+[1376,"底","bottom","dǐ","低 hints sound — 到底(in the end)",[]],
+[1377,"民","people/civil","mín","→眠(mián) — 人民(people)",[]],
+[1378,"眠","sleep","mián","民 hints sound — 睡眠(sleep)",[]],
+[1379,"甫","just/man","fǔ","→辅(fǔ)博(bó)搏(bó)",[]],
+[1380,"辅","assist/supplement","fǔ","甫 hints sound — 辅助(assist)",[]],
+[1381,"博","extensive","bó","甫 hints sound — 博物馆(museum)",[]],
+[1382,"搏","fight/beat","bó","甫 hints sound",[]],
+[1383,"都","all/capital","dōu/dū","者 hints sound — 都是(all are)",[]],
+[1384,"部","part/ministry","bù","— 部分(part)",[]],
+[1385,"郎","young man","láng","",[]],
+[1386,"帮","help/gang","bāng","— 帮助(help)",[]],
+[1387,"乡","countryside/home","xiāng","— 家乡(hometown)",[]],
+[1388,"段","section","duàn","→锻(duàn) — 阶段(stage)",[]],
+[1389,"锻","forge/exercise","duàn","段 hints sound — 锻炼(exercise)",[]],
+[1390,"幻","illusion","huàn","— 幻想(fantasy)",[]],
+[1391,"司","manage/company","sī","→词(cí) — 公司(company)",[]],
+[1392,"词","word/lyrics","cí","司 hints sound — 词语(word)",[]],
+[1393,"书","book","shū","→输(shū) — 读书(read)",[]],
+[1394,"舟","boat","zhōu","→船(chuán)般(bān)",[]],
+[1395,"船","boat","chuán","舟 hints sound",[]],
+[1396,"般","sort/general","bān","舟 hints sound",[]],
+[1397,"盘","plate/examine","pán","舟 hints sound — 盘子(plate)",[]],
+[1398,"搬","move (objects)","bān","舟 hints sound — 搬家(move house)",[]],
+[1399,"瓜","melon","guā","→孤(gū)",[]],
+[1400,"孤","orphan/lonely","gū","瓜 hints sound — 孤独(lonely)",[]],
+[1401,"益","benefit/increase","yì","— 利益(benefit)",[]],
+[1402,"假","false/vacation","jiǎ/jià","→暇(xiá) — 假期(vacation)",[]],
+[1403,"暇","leisure","xiá","假 hints sound",[]],
+[1404,"气","air/spirit","qì","→汽(qì) — 天气(weather)",[]],
+[1405,"汽","steam/gas","qì","气 hints sound — 汽车(car)",[]],
+[1406,"面","face/surface/noodles","miàn","— 面条(noodles)",[]],
+[1407,"革","leather/reform","gé","→鞋(xié)",[]],
+[1408,"鞋","shoe","xié","革 hints sound — 鞋子(shoe)",[]],
+[1409,"勒","force/rein","lè/lēi","革 hints sound",[]],
+[1410,"馨","fragrant","xīn","",[]],
+[1411,"声","sound","shēng","— 声音(sound)",[]],
+[1412,"承","bear/succeed","chéng","→蒸(zhēng)",[]],
+[1413,"蒸","steam","zhēng","承 hints sound",[]],
+[1414,"牙","tooth","yá","→穿(chuān)呀(ya)",[]],
+[1415,"穿","wear/pierce","chuān","牙 hints sound — 穿衣服(get dressed)",[]],
+[1416,"呀","(exclamation)","ya","牙 hints sound",[]],
+[1417,"释","interpret/release","shì","",[]],
+[1418,"番","foreign/turn","fān","→翻(fān)播(bō)",[]],
+[1419,"翻","turn over/translate","fān","番 hints sound — 翻译(translate)",[]],
+[1420,"播","broadcast/sow","bō","番 hints sound — 播放(broadcast)",[]],
+[1421,"毛","hair/mao","máo","→尾(wěi)笔(bǐ)",[]],
+[1422,"尾","tail","wěi","毛 hints sound — 尾巴(tail)",[]],
+[1423,"笔","pen/brush","bǐ","毛 hints sound — 钢笔(pen)",[]],
+[1424,"托","entrust/support","tuō","→宅(zhái)",[]],
+[1425,"宅","residence","zhái","托 hints sound",[]],
+[1426,"展","unfold/exhibit","zhǎn","— 展示(display)",[]],
+[1427,"丧","mourning/lose","sāng/sàng","",[]],
+[1428,"长","long/grow","cháng/zhǎng","→张(zhāng)涨(zhǎng) — 成长(grow up)",[]],
+[1429,"张","open/Zhang","zhāng","长 hints sound — 张开(open up)",[]],
+[1430,"涨","rise (prices)","zhǎng/zhàng","长 hints sound",[]],
+[1431,"雁","wild goose","yàn","→应(yīng)",[]],
+[1432,"应","respond/should","yīng/yìng","雁 hints sound — 应该(should)",[]],
+[1433,"兴","prosper/interest","xīng/xìng","— 高兴(happy)",[]],
+[1434,"举","lift/举行","jǔ","— 举行(hold event)",[]],
+[1435,"检","inspect/restrain","jiǎn","— 检查(inspect)",[]],
+[1436,"脸","face","liǎn","— 脸上(on face)",[]],
+[1437,"险","risk/steep","xiǎn","— 危险(dangerous)",[]],
+[1438,"鸟","bird","niǎo","→鸡(jī)鹰(yīng)鸭(yā)",[]],
+[1439,"鸡","chicken","jī","鸟 hints sound — 鸡蛋(egg)",[]],
+[1440,"鹰","eagle","yīng","鸟 hints sound",[]],
+[1441,"鸭","duck","yā","鸟 hints sound — 鸭子(duck)",[]],
+[1442,"岛","island","dǎo","— 半岛(peninsula)",[]],
+[1443,"遇","encounter","yù","禺 hints sound — 遭遇(encounter)",[]],
+[1444,"缺","lack/deficient","quē","决 hints sound — 缺少(lack)",[]],
+[1445,"遥","distant/remote","yáo","→摇(yáo)",[]],
+[1446,"摇","shake/rock","yáo","遥 hints sound — 摇摆(swing)",[]],
+[1447,"兔","rabbit","tù","→逸(yì)免(miǎn)晚(wǎn)",[]],
+[1448,"逸","escape/ease","yì","兔 hints sound",[]],
+[1449,"免","avoid/exempt","miǎn","兔 hints sound — 免费(free)",[]],
+[1450,"晚","late/evening","wǎn","兔 hints sound — 晚上(evening)",[]],
+[1451,"象","elephant/appearance","xiàng","→像(xiàng)",[]],
+[1452,"像","like/resemble","xiàng","象 hints sound — 好像(seem like)",[]],
+[1453,"马","horse","mǎ","→妈(mā)吗(ma)骂(mà)验(yàn)骑(qí)",[]],
+[1454,"妈","mom","mā","马 hints sound — 妈妈(mom)",[]],
+[1455,"吗","(question particle)","ma","马 hints sound",[]],
+[1456,"骂","scold","mà","马 hints sound",[]],
+[1457,"验","verify/examine","yàn","马 hints sound — 经验(experience)",[]],
+[1458,"骑","ride (horse/bike)","qí","马 hints sound",[]],
+[1459,"虎","tiger","hǔ","→虑(lǜ)虚(xū)",[]],
+[1460,"虑","worry/consider","lǜ","虎 hints sound — 考虑(consider)",[]],
+[1461,"虚","empty/false","xū","虎 hints sound — 虚心(humble)",[]],
+[1462,"鹿","deer","lù","→熊(xióng)",[]],
+[1463,"熊","bear","xióng","鹿 hints sound",[]],
+[1464,"能","can/ability","néng","→态(tài)熊(xióng) — 可能(possible)",[]],
+[1465,"寅","(3rd earthly branch)","yín","→演(yǎn)",[]],
+[1466,"演","perform/evolve","yǎn","寅 hints sound — 演员(actor)",[]],
+[1467,"辰","(5th earthly branch)","chén","→晨(chén)",[]],
+[1468,"晨","morning","chén","辰 hints sound — 早晨(early morning)",[]],
+[1469,"关","close/concern","guān","— 关系(relationship)",[]],
+[1470,"送","send/deliver","sòng","— 送给(give to)",[]],
+[1471,"联","link","lián","耳 hints sound — 联系(contact)",[]],
+[1472,"鬼","ghost/devil","guǐ","→魔(mó)",[]],
+[1473,"魔","demon/magic","mó","鬼 hints sound",[]],
+[1474,"龙","dragon","lóng","→袭(xí)",[]],
+[1475,"袭","attack/inherit","xí","龙 hints sound",[]],
+[1476,"那","that","nà/nèi","→哪(nǎ) — 那么(then)",[]],
+[1477,"哪","which","nǎ","那 hints sound — 哪里(where)",[]],
+[1478,"两","two/both","liǎng","→俩(liǎ) — 两个(two)",[]],
+[1479,"俩","two (people)","liǎ","两 hints sound",[]],
+[1480,"满","full","mǎn","→县(xiàn) — 满足(satisfy)",[]],
+[1481,"县","county","xiàn","满 hints sound",[]],
+[1482,"悬","hang/suspend","xuán","县 hints sound",[]],
+[1483,"窗","window","chuāng","— 窗户(window)",[]],
+[1484,"电","electricity","diàn","— 电话(phone)电视(TV)",[]],
+[1485,"掩","cover/close","yǎn","奄 hints sound",[]],
+[1486,"丑","ugly/clown","chǒu","→扭(niǔ)",[]],
+[1487,"扭","twist/turn","niǔ","丑 hints sound",[]],
+[1488,"黄","yellow","huáng","→横(héng) — 黄色(yellow)",[]],
+[1489,"横","horizontal","héng/hèng","黄 hints sound",[]],
+[1490,"赤","red/bare","chì","→亦(yì)",[]],
+[1491,"亦","also (classical)","yì","赤 hints sound",[]],
+[1492,"弯","bend/curve","wān","→湾(wān)恋(liàn)",[]],
+[1493,"湾","bay/Taiwan","wān","弯 hints sound — 台湾(Taiwan)",[]],
+[1494,"恋","love/miss","liàn","弯 hints sound — 恋爱(be in love)",[]],
+[1495,"变","change","biàn","→蛮(mán) — 变化(change)",[]],
+[1496,"卑","humble/low","bēi","→牌(pái)",[]],
+[1497,"牌","plate/brand","pái","卑 hints sound — 牌子(brand)",[]],
+[1498,"套","set/cover","tào","— 一套(a set)",[]],
+[1499,"曰","say (classical)","yuē","",[]],
+[1500,"属","belong to","shǔ/zhǔ","— 属于(belong to)",[]]
+];
+
+// ── Speech ─────────────────────────────────────────────────
+const synth = window.speechSynthesis;
+let zhVoice = null;
+
+function loadVoices() {
+  const voices = synth.getVoices();
+  // prefer zh-CN, fall back to any zh
+  zhVoice = voices.find(v => v.lang === 'zh-CN')
+         || voices.find(v => v.lang.startsWith('zh'))
+         || null;
+}
+loadVoices();
+if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+
+function speak(text) {
+  if (!synth) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = 0.82;
+  if (zhVoice) u.voice = zhVoice;
+  synth.speak(u);
+}
+
+function speakCurrent(e) {
+  e.stopPropagation();
+  const char = session[idx] ? session[idx][1] : '';
+  if (char) speak(char);
+}
+
+function speakBubble(e, word) {
+  e.stopPropagation();
+  speak(word);
+}
+
+// ── Pinyin toggle ──────────────────────────────────────────
+let showPinyin = false;
+function togglePinyin() {
+  showPinyin = !showPinyin;
+  document.body.classList.toggle('hide-py', !showPinyin);
+  document.getElementById('pyTrack').classList.toggle('on', showPinyin);
+}
+
+// ── Copy ───────────────────────────────────────────────────
+function copyChar(e, elId) {
+  e.stopPropagation();
+  const char = document.getElementById(elId === 'fCopy' ? 'fCopy' : 'bCopy').textContent;
+  navigator.clipboard.writeText(char).then(() => showToast('Copied: ' + char));
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ── State ──────────────────────────────────────────────────
+let session=[], idx=0, pass=0, fail=0, flipped=false, front='char', failed=[];
+
+// ── Session ────────────────────────────────────────────────
+function startSession(useFailed) {
+  const from = parseInt(document.getElementById('iFrom').value) - 1;
+  const to   = parseInt(document.getElementById('iTo').value);
+  const ord  = document.getElementById('iOrder').value;
+  front = document.getElementById('iFront').value;
+
+  let pool = useFailed ? [...failed] : CARDS.slice(from, to);
+  if (ord === 'rand') pool = [...pool].sort(() => Math.random() - .5);
+
+  session=pool; idx=0; pass=0; fail=0; flipped=false; failed=[];
+  show('studyArea'); hide('setupScreen'); hide('resultsArea');
+  document.getElementById('statsRow').classList.remove('hidden');
+  loadCard();
+}
+
+function reviewFailed() { if (failed.length) startSession(true); }
+
+// ── Card ───────────────────────────────────────────────────
+function loadCard() {
+  if (idx >= session.length) { showResults(); return; }
+
+  // always start un-flipped
+  flipped = false;
+  document.getElementById('cardInner').classList.remove('flipped');
+  show('rowFlip'); hide('rowJudge');
+
+  const [num, char, kw, pinyin, note, words] = session[idx];
+
+  document.getElementById('cNum').textContent = '#' + num;
+  document.getElementById('fCopy').textContent = char;
+  document.getElementById('bCopy').textContent = char;
+  document.getElementById('bChar').textContent = char;
+  document.getElementById('bKw').textContent = kw;
+  document.getElementById('bPy').textContent = pinyin;
+  document.getElementById('bNote').textContent = note || '';
+
+  if (front === 'char') {
+    document.getElementById('frontMain').style.fontSize = '4.6rem';
+    document.getElementById('frontMain').textContent = char;
+  } else {
+    document.getElementById('frontMain').style.fontSize = '1.45rem';
+    document.getElementById('frontMain').textContent = kw;
+  }
+
+  buildBubbles(words || []);
+  updateStats();
+  document.getElementById('progBar').style.width = (idx / session.length * 100) + '%';
+}
+
+function buildBubbles(words) {
+  const col = document.getElementById('bubblesCol');
+  col.innerHTML = '<div class="bubbles-label">Common words</div>';
+  if (!words || words.length === 0) { col.classList.add('hidden'); return; }
+  col.classList.remove('hidden');
+  words.forEach(([word, py, def]) => {
+    const d = document.createElement('div');
+    d.className = 'bubble';
+    // pinyin shown/hidden via CSS body class, definition shown on flip
+    d.innerHTML =
+      `<span class="bw-word">${word}</span>` +
+      `<span class="bw-py">${py}</span>` +
+      `<span class="bw-def">${def}</span>` +
+      `<button class="bw-speak" onclick="speakBubble(event,'${word.replace(/'/g,"\'")}')">🔊</button>`;
+    d.addEventListener('click', function(e) {
+      if (e.target.classList.contains('bw-speak')) return;
+      this.classList.toggle('flipped-b');
+    });
+    col.appendChild(d);
+  });
+}
+
+function flipCard() {
+  if (flipped) return;
+  flipped = true;
+  document.getElementById('cardInner').classList.add('flipped');
+  hide('rowFlip'); show('rowJudge');
+  // NO auto-speak — user taps 🔊
+}
+
+function unflipCard() {
+  if (!flipped) return;
+  flipped = false;
+  document.getElementById('cardInner').classList.remove('flipped');
+  show('rowFlip'); hide('rowJudge');
+}
+
+function judge(knew) {
+  if (!flipped) { flipCard(); return; }
+  if (knew) pass++; else { fail++; failed.push(session[idx]); }
+  idx++;
+  loadCard();
+}
+
+function updateStats() {
+  document.getElementById('sIdx').textContent = Math.min(idx+1, session.length);
+  document.getElementById('sTotal').textContent = session.length;
+  document.getElementById('sPass').textContent = pass;
+  document.getElementById('sFail').textContent = fail;
+}
+
+function showResults() {
+  hide('studyArea');
+  document.getElementById('statsRow').classList.add('hidden');
+  show('resultsArea');
+  document.getElementById('progBar').style.width = '100%';
+  document.getElementById('rPass').textContent = pass;
+  document.getElementById('rFail').textContent = fail;
+  const pct = session.length ? Math.round(pass/session.length*100) : 0;
+  document.getElementById('resSub').textContent =
+    session.length + ' cards · ' + pct + '% known · ' + fail + ' to review';
+  document.getElementById('btnFailed').style.display = failed.length ? 'inline-block' : 'none';
+}
+
+function show(id){ document.getElementById(id).classList.remove('hidden'); }
+function hide(id){ document.getElementById(id).classList.add('hidden'); }
+
+// ── Keyboard ───────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.getElementById('studyArea').classList.contains('hidden')) return;
+  if (e.code === 'Space') { e.preventDefault(); flipped ? unflipCard() : flipCard(); }
+  else if (e.code === 'Enter') { e.preventDefault(); flipCard(); }
+  else if (e.code === 'Backspace') { e.preventDefault(); unflipCard(); }
+  else if (e.code === 'ArrowRight') { if (flipped) judge(true); }
+  else if (e.code === 'ArrowLeft')  { if (flipped) judge(false); }
+});
+
+// ── Swipe ──────────────────────────────────────────────────
+let tx = null, ty = null;
+const cw = document.getElementById('cardWrap');
+cw.addEventListener('touchstart', e => {
+  tx = e.touches[0].clientX;
+  ty = e.touches[0].clientY;
+}, {passive:true});
+cw.addEventListener('touchend', e => {
+  if (tx === null) return;
+  const dx = e.changedTouches[0].clientX - tx;
+  const dy = e.changedTouches[0].clientY - ty;
+  tx = null; ty = null;
+  // only horizontal swipes after flip
+  if (!flipped || Math.abs(dx) < 44 || Math.abs(dy) > Math.abs(dx)) return;
+  if (dx > 0) judge(true); else judge(false);
+}, {passive:true});
+
+// ── Range validation ───────────────────────────────────────
+document.getElementById('iFrom').addEventListener('change', () => {
+  const f=+document.getElementById('iFrom').value, t=+document.getElementById('iTo').value;
+  if (f > t) document.getElementById('iTo').value = f;
+});
+document.getElementById('iTo').addEventListener('change', () => {
+  const f=+document.getElementById('iFrom').value, t=+document.getElementById('iTo').value;
+  if (t < f) document.getElementById('iFrom').value = t;
+});
+</script>
+</body>
+</html>
